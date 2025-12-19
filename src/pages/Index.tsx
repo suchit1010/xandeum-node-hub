@@ -5,6 +5,7 @@ import { NetworkCharts } from "@/components/NetworkCharts";
 import { FilterBar } from "@/components/FilterBar";
 import { PNodeTable, PNode } from "@/components/PNodeTable";
 import { PNodeGrid } from "@/components/PNodeGrid";
+import { AnalyticsTab } from "@/components/AnalyticsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, BarChart3, Trophy } from "lucide-react";
 
@@ -183,12 +184,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <div className="glass-card rounded-xl p-6">
-              <h3 className="text-xl font-bold mb-4">Advanced Analytics</h3>
-              <p className="text-muted-foreground">
-                Deep dive analytics coming soon. Track historical performance, predict trends, and optimize your pNode operations.
-              </p>
-            </div>
+            <AnalyticsTab nodes={nodes} />
           </TabsContent>
         </Tabs>
 

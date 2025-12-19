@@ -70,7 +70,10 @@ export function Header({ onRefresh, isLoading }: HeaderProps) {
               <Settings className="h-4 w-4" />
             </Button>
 
-            <Button className="hidden sm:flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button 
+              className="hidden sm:flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={() => window.open("https://www.xandeum.network/docs?_gl=1*1g85y28*_gcl_au*MTI4NDY0NTA3OC4xNzY1MzQ4NzEy", "_blank")}
+            >
               <span>Docs</span>
               <ExternalLink className="h-3 w-3" />
             </Button>
