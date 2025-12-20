@@ -24,12 +24,8 @@ export function Header({ onRefresh, isLoading }: HeaderProps) {
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center">
             <img src={xandeumLogo} alt="Xandeum" className="h-10 w-auto" />
-            <div className="hidden sm:block">
-              <h1 className="text-lg font-bold gradient-text">pNode Analytics</h1>
-              <p className="text-xs text-muted-foreground">Real-time Validator Dashboard</p>
-            </div>
           </div>
 
           {/* Search */}
