@@ -102,7 +102,7 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-8">
         {/* Network Stats */}
-        <NetworkStats stats={stats} />
+        <NetworkStats stats={stats} lastUpdated={new Date()} />
 
         {/* Charts */}
         <NetworkCharts statusData={statusData} trendData={trendData} />
