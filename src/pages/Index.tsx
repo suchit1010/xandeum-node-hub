@@ -8,45 +8,51 @@ import { PNodeGrid } from "@/components/PNodeGrid";
 import { AnalyticsTab } from "@/components/AnalyticsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, BarChart3, Trophy } from "lucide-react";
-
-// Generate mock pNode data
-const generateMockNodes = (): PNode[] => {
-  const statuses: PNode["status"][] = ["online", "online", "online", "online", "syncing", "offline"];
-  const regions = ["North America", "Europe", "Asia Pacific"];
-  
-  return Array.from({ length: 50 }, (_, i) => ({
-    id: `pNode-${String(i + 1).padStart(4, "0")}`,
-    address: `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`,
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    uptime: Math.floor(Math.random() * 15) + 85,
-    capacity: Math.floor(Math.random() * 60) + 40,
-    peers: Math.floor(Math.random() * 150) + 50,
-    lastSeen: new Date(Date.now() - Math.random() * 3600000),
-    region: regions[Math.floor(Math.random() * regions.length)],
-    version: `v${Math.floor(Math.random() * 3) + 1}.${Math.floor(Math.random() * 10)}.0`,
-    stake: Math.floor(Math.random() * 50000) + 10000,
-    isTop: i < 5,
-  }));
-};
+import { fetchPNodes, fetchPodCredits, mapToAppPNode } from "@/lib/prpc";
+import VerificationCard from "@/components/VerificationCard";
 
 const Index = () => {
   const [nodes, setNodes] = useState<PNode[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
+  const [lastSource, setLastSource] = useState<string | undefined>(undefined);
+  const [lastRawJson, setLastRawJson] = useState<any>(null);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [pResp, creditData] = await Promise.all([fetchPNodes(), fetchPodCredits()]);
+      // pResp: { nodes, raw, source }
+      const nodeData = pResp.nodes || [];
+      const enrichedNodes = nodeData.map(node => ({ ...node, stake: creditData[node.pubkey] || 0 }));
+      const mappedNodes = enrichedNodes.map(mapToAppPNode);
+      setNodes(mappedNodes);
+      setLastFetchTime(Date.now());
+      setLastSource(pResp.source);
+      setLastRawJson(pResp.raw);
+    } catch (err) {
+      setError('Failed to fetch pNode data from Xandeum network. Retrying...');
+      console.error('pRPC fetch error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setNodes(generateMockNodes());
+    loadData();
+    const intervalId = setInterval(loadData, 60000); // Poll every 1 min
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleRefresh = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setNodes(generateMockNodes());
-      setIsLoading(false);
-    }, 1000);
+    loadData();
   };
 
   const filteredNodes = useMemo(() => {
@@ -101,6 +107,20 @@ const Index = () => {
       <Header onRefresh={handleRefresh} isLoading={isLoading} />
       
       <main className="container mx-auto px-4 py-8">
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* Verification card */}
+        <VerificationCard
+          lastFetchTime={lastFetchTime}
+          sourceUrl={lastSource}
+          rawJson={lastRawJson}
+          podsCount={nodes.length}
+        />
+
         {/* Network Stats */}
         <NetworkStats stats={stats} lastUpdated={new Date()} />
 
@@ -191,7 +211,7 @@ const Index = () => {
         {/* Footer */}
         <footer className="mt-16 py-8 border-t border-border/50 text-center text-muted-foreground text-sm">
           <p>© 2024 Xandeum Network. Built for the pNode Analytics Bounty.</p>
-          <p className="mt-1">Real-time validator metrics powered by pRPC</p>
+          <p className="mt-1">Real-time validator metrics powered by pRPC from Xandeum gossip network</p>
         </footer>
       </main>
     </div>
