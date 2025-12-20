@@ -33,11 +33,20 @@ export function NetworkCharts({ statusData, trendData }: ChartsProps) {
               </Pie>
               <Tooltip 
                 contentStyle={{ 
-                  background: "hsl(220 25% 10%)", 
-                  border: "1px solid hsl(220 20% 18%)",
+                  background: "hsl(220 20% 12%)", 
+                  border: "1px solid hsl(168 80% 45%)",
                   borderRadius: "8px",
-                  color: "hsl(210 20% 95%)"
-                }} 
+                  color: "#ffffff",
+                  padding: "8px 12px",
+                }}
+                itemStyle={{
+                  color: "#ffffff",
+                }}
+                labelStyle={{
+                  color: "hsl(168 80% 45%)",
+                  fontWeight: "bold",
+                  marginBottom: "4px",
+                }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -88,11 +97,20 @@ export function NetworkCharts({ statusData, trendData }: ChartsProps) {
               />
               <Tooltip 
                 contentStyle={{ 
-                  background: "hsl(220 25% 10%)", 
-                  border: "1px solid hsl(220 20% 18%)",
+                  background: "hsl(220 20% 12%)", 
+                  border: "1px solid hsl(168 80% 45%)",
                   borderRadius: "8px",
-                  color: "hsl(210 20% 95%)"
-                }} 
+                  color: "#ffffff",
+                  padding: "8px 12px",
+                }}
+                itemStyle={{
+                  color: "#ffffff",
+                }}
+                labelStyle={{
+                  color: "hsl(168 80% 45%)",
+                  fontWeight: "bold",
+                  marginBottom: "4px",
+                }}
               />
               <Area
                 type="monotone"
