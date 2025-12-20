@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -8,16 +8,32 @@ import {
 import {
   TrendingUp, TrendingDown, Globe, Cpu, Clock, Activity,
   Zap, Database, Users, ArrowUpRight, ArrowDownRight,
-  Calendar, Download, Filter
+  Calendar, Download, Filter, Map, FileJson, FileSpreadsheet,
+  Info, AlertCircle, CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip as TooltipUI,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PNode } from "@/components/PNodeTable";
+import { toast } from "@/hooks/use-toast";
 
 interface AnalyticsTabProps {
   nodes: PNode[];
 }
 
 export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
+  const [selectedTimeRange, setSelectedTimeRange] = useState("7d");
+
   // Regional Distribution Data
   const regionalData = useMemo(() => {
     const regions = nodes.reduce((acc, node) => {
@@ -29,7 +45,8 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
       name,
       value,
       fill: name === "North America" ? "hsl(168 80% 45%)" : 
-            name === "Europe" ? "hsl(270 70% 60%)" : "hsl(35 95% 55%)"
+            name === "Europe" ? "hsl(270 70% 60%)" : 
+            name === "Asia" ? "hsl(35 95% 55%)" : "hsl(200 80% 50%)"
     }));
   }, [nodes]);
 
@@ -67,7 +84,10 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
   // Version Distribution
   const versionData = useMemo(() => {
     const versions = nodes.reduce((acc, node) => {
-      acc[node.version] = (acc[node.version] || 0) + 1;
+      // Group versions (e.g., 0.8.0, 0.8.1 -> 0.8.x)
+      const parts = node.version.split(".");
+      const groupedVersion = parts.length >= 2 ? `${parts[0]}.${parts[1]}.x` : node.version;
+      acc[groupedVersion] = (acc[groupedVersion] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     
@@ -95,11 +115,47 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
     totalStake: (nodes.reduce((acc, n) => acc + n.stake, 0) / 1000000).toFixed(2),
   }), [nodes]);
 
+  // Status breakdown
+  const statusBreakdown = useMemo(() => ({
+    online: nodes.filter(n => n.status === "online").length,
+    offline: nodes.filter(n => n.status === "offline").length,
+    syncing: nodes.filter(n => n.status === "syncing").length,
+  }), [nodes]);
+
   const tooltipStyle = {
     background: "hsl(220 25% 10%)",
     border: "1px solid hsl(220 20% 18%)",
     borderRadius: "8px",
     color: "hsl(210 20% 95%)"
+  };
+
+  // Export functions
+  const exportToCSV = () => {
+    const headers = ["ID", "Address", "Status", "Uptime", "Capacity", "Peers", "Stake", "Version", "Region"];
+    const rows = nodes.map(n => [
+      n.id, n.address, n.status, n.uptime, n.capacity, n.peers, n.stake, n.version, n.region
+    ]);
+    const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `xandeum-pnodes-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported to CSV", description: `${nodes.length} pNodes exported successfully` });
+  };
+
+  const exportToJSON = () => {
+    const jsonContent = JSON.stringify(nodes, null, 2);
+    const blob = new Blob([jsonContent], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `xandeum-pnodes-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported to JSON", description: `${nodes.length} pNodes exported successfully` });
   };
 
   return (
@@ -116,14 +172,48 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="border-border/50">
-            <Calendar className="h-4 w-4 mr-2" />
-            Last 7 Days
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className={`border-border/50 ${selectedTimeRange === "24h" ? "bg-primary/20" : ""}`}
+            onClick={() => setSelectedTimeRange("24h")}
+          >
+            24h
           </Button>
-          <Button variant="outline" size="sm" className="border-border/50">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className={`border-border/50 ${selectedTimeRange === "7d" ? "bg-primary/20" : ""}`}
+            onClick={() => setSelectedTimeRange("7d")}
+          >
+            7 Days
           </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className={`border-border/50 ${selectedTimeRange === "30d" ? "bg-primary/20" : ""}`}
+            onClick={() => setSelectedTimeRange("30d")}
+          >
+            30 Days
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="border-border/50">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover border-border">
+              <DropdownMenuItem onClick={exportToCSV} className="cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToJSON} className="cursor-pointer">
+                <FileJson className="h-4 w-4 mr-2" />
+                Export as JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -135,6 +225,7 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           value={`${metrics.avgUptime}%`}
           trend={+2.3}
           color="text-emerald-400"
+          tooltip="Average percentage of time all pNodes have been active"
         />
         <MetricCard
           icon={<Database className="h-5 w-5" />}
@@ -142,6 +233,7 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           value={`${metrics.avgCapacity}%`}
           trend={-1.2}
           color="text-xandeum-orange"
+          tooltip="Average storage utilization across all pNodes"
         />
         <MetricCard
           icon={<Users className="h-5 w-5" />}
@@ -149,6 +241,7 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           value={metrics.totalPeers.toLocaleString()}
           trend={+5.7}
           color="text-primary"
+          tooltip="Sum of all peer connections across the network"
         />
         <MetricCard
           icon={<Zap className="h-5 w-5" />}
@@ -156,7 +249,39 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           value={`${metrics.totalStake}M`}
           trend={+8.4}
           color="text-xandeum-purple"
+          tooltip="Total tokens staked across all pNodes"
         />
+      </div>
+
+      {/* Status Overview Row */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
+          <div className="p-3 rounded-full bg-emerald-500/20">
+            <CheckCircle className="h-6 w-6 text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-emerald-400">{statusBreakdown.online}</p>
+            <p className="text-sm text-muted-foreground">Online Nodes</p>
+          </div>
+        </div>
+        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
+          <div className="p-3 rounded-full bg-amber-500/20">
+            <Activity className="h-6 w-6 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-amber-400">{statusBreakdown.syncing}</p>
+            <p className="text-sm text-muted-foreground">Syncing</p>
+          </div>
+        </div>
+        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
+          <div className="p-3 rounded-full bg-red-500/20">
+            <AlertCircle className="h-6 w-6 text-red-400" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-red-400">{statusBreakdown.offline}</p>
+            <p className="text-sm text-muted-foreground">Offline</p>
+          </div>
+        </div>
       </div>
 
       {/* Network Health Score + Regional Distribution */}
@@ -166,6 +291,16 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           <h4 className="font-semibold mb-4 flex items-center gap-2">
             <Activity className="h-4 w-4 text-primary" />
             Network Health Score
+            <TooltipProvider>
+              <TooltipUI>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[200px] bg-popover border-border">
+                  <p>Composite score based on: 40% availability, 40% uptime, 20% capacity headroom</p>
+                </TooltipContent>
+              </TooltipUI>
+            </TooltipProvider>
           </h4>
           <div className="h-[200px] relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -199,7 +334,7 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
             <div className="p-2 rounded-lg bg-secondary/30">
               <p className="text-muted-foreground">Availability</p>
-              <p className="font-semibold text-emerald-400">98.5%</p>
+              <p className="font-semibold text-emerald-400">{((statusBreakdown.online / nodes.length) * 100).toFixed(1)}%</p>
             </div>
             <div className="p-2 rounded-lg bg-secondary/30">
               <p className="text-muted-foreground">Latency</p>
@@ -217,6 +352,16 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           <h4 className="font-semibold mb-4 flex items-center gap-2">
             <Globe className="h-4 w-4 text-primary" />
             Regional Distribution
+            <TooltipProvider>
+              <TooltipUI>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[200px] bg-popover border-border">
+                  <p>Geographic distribution of pNodes derived from IP geolocation</p>
+                </TooltipContent>
+              </TooltipUI>
+            </TooltipProvider>
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
             <div className="h-[200px]">
@@ -259,11 +404,27 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
         </div>
       </div>
 
+      {/* Geo Map Placeholder */}
+      <div className="glass-card rounded-xl p-6">
+        <h4 className="font-semibold mb-4 flex items-center gap-2">
+          <Map className="h-4 w-4 text-primary" />
+          Network Geography
+          <span className="text-xs bg-xandeum-purple/20 text-xandeum-purple px-2 py-0.5 rounded-full ml-2">Coming Soon</span>
+        </h4>
+        <div className="h-[200px] flex items-center justify-center rounded-lg bg-secondary/20 border border-dashed border-border/50">
+          <div className="text-center">
+            <Map className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">Interactive world map showing pNode locations</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Decentralization insights from IP geolocation</p>
+          </div>
+        </div>
+      </div>
+
       {/* Performance Over Time */}
       <div className="glass-card rounded-xl p-6">
         <h4 className="font-semibold mb-4 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-primary" />
-          Performance Trends (7 Days)
+          Performance Trends ({selectedTimeRange === "24h" ? "24 Hours" : selectedTimeRange === "7d" ? "7 Days" : "30 Days"})
         </h4>
         <div className="h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -309,6 +470,16 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
           <h4 className="font-semibold mb-4 flex items-center gap-2">
             <Cpu className="h-4 w-4 text-primary" />
             Capacity Utilization
+            <TooltipProvider>
+              <TooltipUI>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[200px] bg-popover border-border">
+                  <p>Distribution of storage usage across pNodes</p>
+                </TooltipContent>
+              </TooltipUI>
+            </TooltipProvider>
           </h4>
           <div className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -365,10 +536,20 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
         <h4 className="font-semibold mb-4 flex items-center gap-2">
           <Database className="h-4 w-4 text-primary" />
           Node Version Distribution
+          <TooltipProvider>
+            <TooltipUI>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[200px] bg-popover border-border">
+                <p>Versions grouped by major.minor release for easier tracking</p>
+              </TooltipContent>
+            </TooltipUI>
+          </TooltipProvider>
         </h4>
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
           {versionData.map((v, i) => (
-            <div key={v.version} className="p-4 rounded-lg bg-secondary/30 text-center">
+            <div key={v.version} className="p-4 rounded-lg bg-secondary/30 text-center hover:bg-secondary/50 transition-colors">
               <p className="font-mono text-lg font-semibold text-primary">{v.version}</p>
               <p className="text-2xl font-bold mt-1">{v.count}</p>
               <p className="text-xs text-muted-foreground">nodes</p>
@@ -393,21 +574,37 @@ function MetricCard({
   value,
   trend,
   color,
+  tooltip,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   trend: number;
   color: string;
+  tooltip?: string;
 }) {
   const isPositive = trend >= 0;
   return (
     <div className="glass-card rounded-xl p-4">
       <div className="flex items-center justify-between mb-2">
         <span className={color}>{icon}</span>
-        <div className={`flex items-center text-xs ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
-          {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-          {Math.abs(trend)}%
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center text-xs ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+            {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+            {Math.abs(trend)}%
+          </div>
+          {tooltip && (
+            <TooltipProvider>
+              <TooltipUI>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[180px] bg-popover border-border text-xs">
+                  <p>{tooltip}</p>
+                </TooltipContent>
+              </TooltipUI>
+            </TooltipProvider>
+          )}
         </div>
       </div>
       <p className="text-2xl font-bold">{value}</p>
