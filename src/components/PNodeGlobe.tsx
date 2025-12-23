@@ -529,7 +529,7 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
 
       // Auto rotation
       if (autoRotate && !isDragging) {
-        globe.rotation.y += 0.002;
+        globe.rotation.y += 0.006;
       }
 
       // Damping for manual rotation
