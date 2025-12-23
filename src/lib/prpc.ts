@@ -64,7 +64,7 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: any; source?
           const mapped = nodesArray.map((node: PNode) => ({
             ...node,
             // Derive status based on uptime
-            status: node && node.uptime && node.uptime > 0 ? 'online' : 'offline',
+            status: (node && node.uptime && node.uptime > 0 ? 'online' : 'offline') as 'online' | 'offline' | 'syncing',
           }));
           return { nodes: mapped, raw: response.data, source: url };
         }

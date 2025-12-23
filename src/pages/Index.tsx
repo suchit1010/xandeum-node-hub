@@ -6,6 +6,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { PNodeTable, PNode } from "@/components/PNodeTable";
 import { PNodeGrid } from "@/components/PNodeGrid";
 import { AnalyticsTab } from "@/components/AnalyticsTab";
+import { PNodeGlobe } from "@/components/PNodeGlobe";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, BarChart3, Trophy } from "lucide-react";
 import { fetchPNodes, fetchPodCredits, mapToAppPNode } from "@/lib/prpc";
@@ -123,6 +124,11 @@ const Index = () => {
 
         {/* Network Stats */}
         <NetworkStats stats={stats} lastUpdated={new Date()} />
+
+        {/* 3D Globe Visualization */}
+        <div className="mb-8">
+          <PNodeGlobe nodes={nodes} />
+        </div>
 
         {/* Charts */}
         <NetworkCharts statusData={statusData} trendData={trendData} />
