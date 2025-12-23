@@ -18,34 +18,133 @@ interface PNodeGlobeProps {
   }>;
 }
 
-// Function to convert IP to approximate geo coordinates (mock for demo)
-const ipToGeoLocation = (address: string, index: number): { lat: number; lng: number } => {
-  // In production, you'd use a real IP geolocation service
-  // For demo, distribute nodes around the globe based on address hash
-  const hash = address.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+// Mock pNode locations for demo when no real data
+const mockNodeLocations: PNodeLocation[] = [
+  // North America
+  { id: 'node-1', lat: 37.7749, lng: -122.4194, status: 'online', stake: 5000 },
+  { id: 'node-2', lat: 40.7128, lng: -74.006, status: 'online', stake: 8000 },
+  { id: 'node-3', lat: 34.0522, lng: -118.2437, status: 'online', stake: 3500 },
+  { id: 'node-4', lat: 41.8781, lng: -87.6298, status: 'syncing', stake: 2000 },
+  { id: 'node-5', lat: 47.6062, lng: -122.3321, status: 'online', stake: 4500 },
+  { id: 'node-6', lat: 25.7617, lng: -80.1918, status: 'online', stake: 3000 },
+  { id: 'node-7', lat: 49.2827, lng: -123.1207, status: 'online', stake: 2800 },
+  // Europe
+  { id: 'node-8', lat: 51.5074, lng: -0.1278, status: 'online', stake: 7500 },
+  { id: 'node-9', lat: 52.52, lng: 13.405, status: 'online', stake: 6000 },
+  { id: 'node-10', lat: 48.8566, lng: 2.3522, status: 'online', stake: 5500 },
+  { id: 'node-11', lat: 41.9028, lng: 12.4964, status: 'syncing', stake: 3200 },
+  { id: 'node-12', lat: 59.3293, lng: 18.0686, status: 'online', stake: 4000 },
+  { id: 'node-13', lat: 52.3676, lng: 4.9041, status: 'online', stake: 5200 },
+  { id: 'node-14', lat: 50.0755, lng: 14.4378, status: 'online', stake: 2900 },
+  { id: 'node-15', lat: 55.7558, lng: 37.6173, status: 'online', stake: 4800 },
+  // Asia
+  { id: 'node-16', lat: 35.6762, lng: 139.6503, status: 'online', stake: 9000 },
+  { id: 'node-17', lat: 22.3193, lng: 114.1694, status: 'online', stake: 7000 },
+  { id: 'node-18', lat: 1.3521, lng: 103.8198, status: 'online', stake: 6500 },
+  { id: 'node-19', lat: 37.5665, lng: 126.978, status: 'online', stake: 5800 },
+  { id: 'node-20', lat: 31.2304, lng: 121.4737, status: 'syncing', stake: 4200 },
+  { id: 'node-21', lat: 19.076, lng: 72.8777, status: 'online', stake: 3800 },
+  { id: 'node-22', lat: 28.6139, lng: 77.209, status: 'online', stake: 3100 },
+  { id: 'node-23', lat: 13.7563, lng: 100.5018, status: 'online', stake: 2700 },
+  // Oceania
+  { id: 'node-24', lat: -33.8688, lng: 151.2093, status: 'online', stake: 4500 },
+  { id: 'node-25', lat: -37.8136, lng: 144.9631, status: 'online', stake: 3200 },
+  { id: 'node-26', lat: -36.8509, lng: 174.7645, status: 'syncing', stake: 1800 },
+  // South America
+  { id: 'node-27', lat: -23.5505, lng: -46.6333, status: 'online', stake: 4000 },
+  { id: 'node-28', lat: -34.6037, lng: -58.3816, status: 'online', stake: 2500 },
+  { id: 'node-29', lat: -33.4489, lng: -70.6693, status: 'online', stake: 2100 },
+  // Africa
+  { id: 'node-30', lat: -33.9249, lng: 18.4241, status: 'online', stake: 1900 },
+  { id: 'node-31', lat: 30.0444, lng: 31.2357, status: 'online', stake: 2300 },
+  { id: 'node-32', lat: 6.5244, lng: 3.3792, status: 'syncing', stake: 1500 },
+];
+
+// Continent outline coordinates (simplified for dot pattern)
+const continentData = [
+  // North America outline
+  { points: [
+    [70, -170], [72, -130], [70, -100], [60, -95], [55, -80], [45, -65], [40, -75], [30, -85],
+    [25, -80], [20, -90], [15, -95], [20, -105], [25, -110], [30, -115], [35, -120], [40, -125],
+    [48, -125], [55, -130], [60, -145], [65, -165], [70, -170]
+  ]},
+  // South America outline
+  { points: [
+    [10, -80], [5, -77], [0, -80], [-5, -80], [-10, -75], [-20, -70], [-25, -65], [-30, -60],
+    [-40, -65], [-50, -70], [-55, -68], [-55, -75], [-45, -75], [-35, -55], [-25, -45], [-10, -35],
+    [-5, -50], [0, -50], [5, -60], [10, -75], [10, -80]
+  ]},
+  // Europe outline
+  { points: [
+    [70, -10], [70, 30], [65, 40], [60, 30], [55, 20], [50, 5], [45, 0], [40, -5], [35, -10],
+    [35, 0], [40, 20], [45, 25], [50, 40], [55, 35], [60, 45], [65, 50], [70, 40], [70, -10]
+  ]},
+  // Africa outline
+  { points: [
+    [35, -10], [30, 0], [25, 10], [15, 10], [10, 5], [5, 0], [0, 10], [-5, 15], [-15, 20],
+    [-25, 30], [-35, 20], [-35, 25], [-30, 30], [-20, 35], [-10, 40], [0, 45], [10, 50],
+    [20, 40], [30, 35], [35, 30], [35, -10]
+  ]},
+  // Asia outline
+  { points: [
+    [70, 40], [75, 80], [75, 100], [70, 140], [65, 170], [60, 160], [55, 140], [50, 130],
+    [45, 140], [40, 130], [35, 120], [30, 120], [25, 105], [20, 100], [15, 100], [10, 105],
+    [5, 100], [0, 105], [5, 115], [15, 120], [25, 120], [30, 130], [35, 135], [40, 145],
+    [45, 145], [50, 150], [55, 160], [65, 170], [70, 180], [75, 170], [75, 140], [70, 40]
+  ]},
+  // Australia outline
+  { points: [
+    [-15, 125], [-20, 115], [-25, 115], [-30, 115], [-35, 120], [-38, 145], [-35, 150],
+    [-30, 155], [-25, 150], [-20, 145], [-15, 140], [-12, 135], [-15, 125]
+  ]},
+];
+
+// Generate dot pattern for continents
+const generateContinentDots = (): { lat: number; lng: number }[] => {
+  const dots: { lat: number; lng: number }[] = [];
   
-  // Create clusters in major regions
-  const regions = [
-    { lat: 37.7749, lng: -122.4194 }, // San Francisco
-    { lat: 40.7128, lng: -74.006 },   // New York
-    { lat: 51.5074, lng: -0.1278 },   // London
-    { lat: 52.52, lng: 13.405 },      // Berlin
-    { lat: 48.8566, lng: 2.3522 },    // Paris
-    { lat: 35.6762, lng: 139.6503 },  // Tokyo
-    { lat: 22.3193, lng: 114.1694 },  // Hong Kong
-    { lat: 1.3521, lng: 103.8198 },   // Singapore
-    { lat: -33.8688, lng: 151.2093 }, // Sydney
-    { lat: 55.7558, lng: 37.6173 },   // Moscow
-    { lat: 19.076, lng: 72.8777 },    // Mumbai
-    { lat: -23.5505, lng: -46.6333 }, // São Paulo
-  ];
-  
-  const baseRegion = regions[(hash + index) % regions.length];
-  // Add some randomness around the region
-  return {
-    lat: baseRegion.lat + (Math.sin(hash * index) * 8),
-    lng: baseRegion.lng + (Math.cos(hash * index) * 12),
+  // Helper to check if point is inside polygon (simplified)
+  const isInsideContinent = (lat: number, lng: number): boolean => {
+    // Simplified continental boundaries
+    // North America
+    if (lat > 15 && lat < 72 && lng > -170 && lng < -50) return true;
+    // South America  
+    if (lat > -57 && lat < 12 && lng > -82 && lng < -35) return true;
+    // Europe
+    if (lat > 35 && lat < 72 && lng > -12 && lng < 60) return true;
+    // Africa
+    if (lat > -35 && lat < 37 && lng > -18 && lng < 52) return true;
+    // Asia
+    if (lat > 5 && lat < 77 && lng > 60 && lng < 180) return true;
+    if (lat > 25 && lat < 45 && lng > 25 && lng < 60) return true;
+    // Australia
+    if (lat > -45 && lat < -10 && lng > 112 && lng < 155) return true;
+    // Indonesia/SE Asia islands
+    if (lat > -10 && lat < 8 && lng > 95 && lng < 140) return true;
+    // Japan
+    if (lat > 30 && lat < 45 && lng > 128 && lng < 146) return true;
+    // UK/Ireland
+    if (lat > 50 && lat < 60 && lng > -11 && lng < 2) return true;
+    
+    return false;
   };
+
+  // Generate dot grid
+  const latStep = 2.5;
+  const lngStep = 2.5;
+  
+  for (let lat = -60; lat <= 75; lat += latStep) {
+    for (let lng = -180; lng <= 180; lng += lngStep) {
+      if (isInsideContinent(lat, lng)) {
+        // Add some randomness to make it look more organic
+        const jitterLat = (Math.random() - 0.5) * 1;
+        const jitterLng = (Math.random() - 0.5) * 1;
+        dots.push({ lat: lat + jitterLat, lng: lng + jitterLng });
+      }
+    }
+  }
+  
+  return dots;
 };
 
 // Convert lat/lng to 3D coordinates on sphere
@@ -69,7 +168,7 @@ const createCurvedLine = (
 ): THREE.Line => {
   const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
   const distance = start.distanceTo(end);
-  mid.normalize().multiplyScalar(1 + distance * 0.15);
+  mid.normalize().multiplyScalar(1 + distance * 0.2);
   
   const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
   const points = curve.getPoints(50);
@@ -91,15 +190,26 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
   const globeRef = useRef<THREE.Group | null>(null);
   const frameRef = useRef<number>(0);
   
-  // Convert nodes to geo locations
+  // Use mock data if no real nodes, or real nodes if available
   const nodeLocations = useMemo<PNodeLocation[]>(() => {
-    return nodes.map((node, index) => ({
-      id: node.id,
-      ...ipToGeoLocation(node.address, index),
-      status: node.status,
-      stake: node.stake,
-    }));
+    if (nodes.length === 0) {
+      return mockNodeLocations;
+    }
+    // Map real nodes to locations
+    return nodes.map((node, index) => {
+      const mockLocation = mockNodeLocations[index % mockNodeLocations.length];
+      return {
+        id: node.id,
+        lat: mockLocation.lat + (Math.sin(index) * 5),
+        lng: mockLocation.lng + (Math.cos(index) * 8),
+        status: node.status,
+        stake: node.stake,
+      };
+    });
   }, [nodes]);
+
+  // Pre-generate continent dots
+  const continentDots = useMemo(() => generateContinentDots(), []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -114,7 +224,7 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
 
     // Camera
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.z = 3.5;
+    camera.position.z = 3.2;
 
     // Renderer
     const renderer = new THREE.WebGLRenderer({ 
@@ -134,35 +244,55 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
 
     // Xandeum theme colors
     const tealColor = new THREE.Color('hsl(168, 80%, 45%)');
-    const purpleColor = new THREE.Color('hsl(290, 60%, 40%)');
     const orangeColor = new THREE.Color('hsl(35, 95%, 55%)');
+    const purpleColor = new THREE.Color('hsl(290, 60%, 50%)');
 
-    // Earth sphere with wireframe
+    // Earth sphere base
     const earthRadius = 1;
     const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
     
-    // Inner glow sphere
-    const innerMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color('hsl(220, 25%, 8%)'),
+    // Semi-transparent base sphere
+    const baseMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color('hsl(220, 25%, 12%)'),
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.9,
     });
-    const innerSphere = new THREE.Mesh(earthGeometry, innerMaterial);
-    globe.add(innerSphere);
+    const baseSphere = new THREE.Mesh(earthGeometry, baseMaterial);
+    globe.add(baseSphere);
 
-    // Wireframe grid
-    const wireframeGeometry = new THREE.SphereGeometry(earthRadius * 1.002, 36, 24);
-    const wireframeMaterial = new THREE.MeshBasicMaterial({
+    // Latitude/Longitude grid lines (subtle)
+    const gridGeometry = new THREE.SphereGeometry(earthRadius * 1.001, 48, 24);
+    const gridMaterial = new THREE.MeshBasicMaterial({
       color: tealColor,
       wireframe: true,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.08,
     });
-    const wireframe = new THREE.Mesh(wireframeGeometry, wireframeMaterial);
-    globe.add(wireframe);
+    const gridSphere = new THREE.Mesh(gridGeometry, gridMaterial);
+    globe.add(gridSphere);
+
+    // Create continent dots
+    const continentDotsGroup = new THREE.Group();
+    globe.add(continentDotsGroup);
+
+    const dotGeometry = new THREE.CircleGeometry(0.012, 8);
+    const dotMaterial = new THREE.MeshBasicMaterial({
+      color: tealColor,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide,
+    });
+
+    continentDots.forEach((dot) => {
+      const position = latLngToVector3(dot.lat, dot.lng, earthRadius * 1.002);
+      const dotMesh = new THREE.Mesh(dotGeometry, dotMaterial);
+      dotMesh.position.copy(position);
+      dotMesh.lookAt(new THREE.Vector3(0, 0, 0));
+      continentDotsGroup.add(dotMesh);
+    });
 
     // Outer glow
-    const glowGeometry = new THREE.SphereGeometry(earthRadius * 1.15, 32, 32);
+    const glowGeometry = new THREE.SphereGeometry(earthRadius * 1.12, 32, 32);
     const glowMaterial = new THREE.ShaderMaterial({
       uniforms: {
         glowColor: { value: tealColor },
@@ -178,8 +308,8 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
         uniform vec3 glowColor;
         varying vec3 vNormal;
         void main() {
-          float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-          gl_FragColor = vec4(glowColor, intensity * 0.4);
+          float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+          gl_FragColor = vec4(glowColor, intensity * 0.35);
         }
       `,
       side: THREE.BackSide,
@@ -189,109 +319,96 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     globe.add(glow);
 
-    // Node points
+    // Node points group
     const pointsGroup = new THREE.Group();
     globe.add(pointsGroup);
 
+    // Connection lines group
     const linesGroup = new THREE.Group();
     globe.add(linesGroup);
 
-    // Create node points
+    // Create node points with glowing effect
     nodeLocations.forEach((node) => {
-      const position = latLngToVector3(node.lat, node.lng, earthRadius * 1.01);
+      const position = latLngToVector3(node.lat, node.lng, earthRadius * 1.015);
       
-      // Point geometry
-      const pointGeometry = new THREE.SphereGeometry(0.015, 16, 16);
       const pointColor = node.status === 'online' 
         ? tealColor 
         : node.status === 'syncing' 
           ? orangeColor 
           : new THREE.Color('hsl(0, 84%, 60%)');
       
+      // Main point
+      const pointGeometry = new THREE.SphereGeometry(0.02, 16, 16);
       const pointMaterial = new THREE.MeshBasicMaterial({
         color: pointColor,
         transparent: true,
-        opacity: 0.9,
+        opacity: 1,
       });
-      
       const point = new THREE.Mesh(pointGeometry, pointMaterial);
       point.position.copy(position);
       pointsGroup.add(point);
 
-      // Glow ring for each point
-      const ringGeometry = new THREE.RingGeometry(0.02, 0.035, 32);
+      // Glow ring
+      const ringGeometry = new THREE.RingGeometry(0.025, 0.04, 32);
       const ringMaterial = new THREE.MeshBasicMaterial({
         color: pointColor,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.5,
         side: THREE.DoubleSide,
       });
       const ring = new THREE.Mesh(ringGeometry, ringMaterial);
       ring.position.copy(position);
       ring.lookAt(new THREE.Vector3(0, 0, 0));
       pointsGroup.add(ring);
+
+      // Pulse ring (animated)
+      const pulseGeometry = new THREE.RingGeometry(0.03, 0.035, 32);
+      const pulseMaterial = new THREE.MeshBasicMaterial({
+        color: pointColor,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+      });
+      const pulse = new THREE.Mesh(pulseGeometry, pulseMaterial);
+      pulse.position.copy(position);
+      pulse.lookAt(new THREE.Vector3(0, 0, 0));
+      pulse.userData = { 
+        isPulse: true, 
+        baseScale: 1,
+        speed: 0.5 + Math.random() * 0.5 
+      };
+      pointsGroup.add(pulse);
     });
 
-    // Create connection lines between nearby online nodes
+    // Create connection lines between online nodes
     const onlineNodes = nodeLocations.filter(n => n.status === 'online');
-    const maxConnections = Math.min(40, onlineNodes.length * 2);
-    let connectionCount = 0;
+    const connections: Set<string> = new Set();
 
-    for (let i = 0; i < onlineNodes.length && connectionCount < maxConnections; i++) {
-      const node1 = onlineNodes[i];
-      const pos1 = latLngToVector3(node1.lat, node1.lng, earthRadius * 1.01);
+    onlineNodes.forEach((node1, i) => {
+      const pos1 = latLngToVector3(node1.lat, node1.lng, earthRadius * 1.015);
       
       // Connect to 2-3 nearest nodes
       const nearbyNodes = onlineNodes
         .filter((_, j) => j !== i)
         .sort((a, b) => {
-          const distA = Math.sqrt(
-            Math.pow(a.lat - node1.lat, 2) + Math.pow(a.lng - node1.lng, 2)
-          );
-          const distB = Math.sqrt(
-            Math.pow(b.lat - node1.lat, 2) + Math.pow(b.lng - node1.lng, 2)
-          );
+          const distA = Math.sqrt(Math.pow(a.lat - node1.lat, 2) + Math.pow(a.lng - node1.lng, 2));
+          const distB = Math.sqrt(Math.pow(b.lat - node1.lat, 2) + Math.pow(b.lng - node1.lng, 2));
           return distA - distB;
         })
         .slice(0, 2);
 
       nearbyNodes.forEach((node2) => {
-        if (connectionCount >= maxConnections) return;
-        const pos2 = latLngToVector3(node2.lat, node2.lng, earthRadius * 1.01);
-        const line = createCurvedLine(pos1, pos2, tealColor, 0.3);
+        const connectionKey = [node1.id, node2.id].sort().join('-');
+        if (connections.has(connectionKey)) return;
+        connections.add(connectionKey);
+
+        const pos2 = latLngToVector3(node2.lat, node2.lng, earthRadius * 1.015);
+        const line = createCurvedLine(pos1, pos2, tealColor, 0.4);
         linesGroup.add(line);
-        connectionCount++;
       });
-    }
-
-    // Ambient particles
-    const particlesGeometry = new THREE.BufferGeometry();
-    const particleCount = 200;
-    const positions = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount; i++) {
-      const radius = 1.3 + Math.random() * 0.7;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 2 - 1);
-      
-      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = radius * Math.cos(phi);
-    }
-
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const particlesMaterial = new THREE.PointsMaterial({
-      color: tealColor,
-      size: 0.008,
-      transparent: true,
-      opacity: 0.5,
     });
 
-    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particles);
-
-    // Mouse interaction
+    // Mouse interaction variables
     let isDragging = false;
     let previousMousePosition = { x: 0, y: 0 };
     let rotationVelocity = { x: 0, y: 0 };
@@ -319,6 +436,9 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
       globe.rotation.x += rotationVelocity.x;
       globe.rotation.y += rotationVelocity.y;
 
+      // Clamp vertical rotation
+      globe.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, globe.rotation.x));
+
       previousMousePosition = { x: e.clientX, y: e.clientY };
     };
 
@@ -327,16 +447,10 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
       setTimeout(() => { autoRotate = true; }, 3000);
     };
 
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      camera.position.z = Math.max(2, Math.min(6, camera.position.z + e.deltaY * 0.002));
-    };
-
     container.addEventListener('mousedown', onMouseDown);
     container.addEventListener('mousemove', onMouseMove);
     container.addEventListener('mouseup', onMouseUp);
     container.addEventListener('mouseleave', onMouseUp);
-    container.addEventListener('wheel', onWheel, { passive: false });
 
     // Touch events
     const onTouchStart = (e: TouchEvent) => {
@@ -362,6 +476,7 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
 
       globe.rotation.x += rotationVelocity.x;
       globe.rotation.y += rotationVelocity.y;
+      globe.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, globe.rotation.x));
 
       previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     };
@@ -376,8 +491,10 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
     container.addEventListener('touchend', onTouchEnd);
 
     // Animation loop
+    let time = 0;
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
+      time += 0.016;
 
       // Auto rotation
       if (autoRotate && !isDragging) {
@@ -390,11 +507,20 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
         rotationVelocity.y *= 0.95;
         globe.rotation.x += rotationVelocity.x;
         globe.rotation.y += rotationVelocity.y;
+        globe.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, globe.rotation.x));
       }
 
-      // Animate particles
-      particles.rotation.y += 0.0005;
-      particles.rotation.x += 0.0002;
+      // Animate pulse rings
+      pointsGroup.children.forEach((child) => {
+        if (child.userData.isPulse) {
+          const scale = 1 + Math.sin(time * child.userData.speed * 3) * 0.5;
+          child.scale.set(scale, scale, 1);
+          const mesh = child as THREE.Mesh;
+          if (mesh.material && !Array.isArray(mesh.material)) {
+            (mesh.material as THREE.MeshBasicMaterial).opacity = 0.3 * (1 - (scale - 1));
+          }
+        }
+      });
 
       renderer.render(scene, camera);
     };
@@ -421,7 +547,6 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
       container.removeEventListener('mousemove', onMouseMove);
       container.removeEventListener('mouseup', onMouseUp);
       container.removeEventListener('mouseleave', onMouseUp);
-      container.removeEventListener('wheel', onWheel);
       container.removeEventListener('touchstart', onTouchStart);
       container.removeEventListener('touchmove', onTouchMove);
       container.removeEventListener('touchend', onTouchEnd);
@@ -431,12 +556,12 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
       }
       rendererRef.current?.dispose();
     };
-  }, [nodeLocations]);
+  }, [nodeLocations, continentDots]);
 
   // Calculate stats
-  const onlineCount = nodes.filter(n => n.status === 'online').length;
-  const syncingCount = nodes.filter(n => n.status === 'syncing').length;
-  const offlineCount = nodes.filter(n => n.status === 'offline').length;
+  const onlineCount = nodeLocations.filter(n => n.status === 'online').length;
+  const syncingCount = nodeLocations.filter(n => n.status === 'syncing').length;
+  const offlineCount = nodeLocations.filter(n => n.status === 'offline').length;
 
   return (
     <div className="glass-card rounded-xl p-6 relative overflow-hidden">
@@ -463,12 +588,12 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
       
       <div 
         ref={containerRef} 
-        className="w-full h-[400px] cursor-grab active:cursor-grabbing"
+        className="w-full h-[450px] cursor-grab active:cursor-grabbing"
         style={{ touchAction: 'none' }}
       />
       
       <div className="absolute bottom-8 left-8 text-xs text-muted-foreground">
-        <p>Drag to rotate • Scroll to zoom</p>
+        <p>Drag to rotate</p>
       </div>
     </div>
   );
