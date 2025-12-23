@@ -60,119 +60,67 @@ const mockNodeLocations: PNodeLocation[] = [
   { id: 'node-32', lat: 6.5244, lng: 3.3792, status: 'syncing', stake: 1500 },
 ];
 
-// Generate detailed dot pattern for continents (more realistic world map)
-const generateContinentDots = (): { lat: number; lng: number }[] => {
-  const dots: { lat: number; lng: number }[] = [];
+// Generate elegant grid pattern for the entire globe (like reference image)
+const generateGlobeGrid = (): { lat: number; lng: number; type: 'grid' | 'land' }[] => {
+  const dots: { lat: number; lng: number; type: 'grid' | 'land' }[] = [];
   
-  // More precise continental boundaries using simplified polygon checks
-  const isInsideContinent = (lat: number, lng: number): boolean => {
-    // North America (main landmass)
-    if (lat > 25 && lat < 72) {
-      if (lng > -170 && lng < -50) {
-        // Western USA/Canada
-        if (lat > 48 && lng > -140 && lng < -110) return true;
-        // Alaska
-        if (lat > 58 && lng > -170 && lng < -130) return true;
-        // Canada middle
-        if (lat > 50 && lat < 70 && lng > -130 && lng < -60) return true;
-        // USA main
-        if (lat > 25 && lat < 50 && lng > -125 && lng < -65) return true;
-        // East coast curve
-        if (lat > 25 && lat < 45 && lng > -82 && lng < -65) return true;
-      }
+  // Continental land detection - simplified but cleaner boundaries
+  const isLand = (lat: number, lng: number): boolean => {
+    // North America
+    if (lat > 24 && lat < 72 && lng > -170 && lng < -52) {
+      if (lat > 48 && lng > -145 && lng < -52) return true; // Canada
+      if (lat > 24 && lat < 50 && lng > -130 && lng < -65) return true; // USA
+      if (lat > 58 && lng > -170 && lng < -130) return true; // Alaska
     }
     // Mexico & Central America
-    if (lat > 8 && lat < 32 && lng > -118 && lng < -85) return true;
+    if (lat > 7 && lat < 33 && lng > -120 && lng < -80) return true;
     
-    // South America  
-    if (lat > -56 && lat < 12) {
-      if (lng > -82 && lng < -34) {
-        // Northern part (wider)
-        if (lat > -5 && lat < 12 && lng > -80 && lng < -50) return true;
-        // Brazil
-        if (lat > -25 && lat < 5 && lng > -75 && lng < -34) return true;
-        // Southern cone
-        if (lat > -56 && lat < -20 && lng > -75 && lng < -50) return true;
-        // Chile
-        if (lat > -56 && lat < -18 && lng > -78 && lng < -66) return true;
-      }
-    }
+    // South America
+    if (lat > -58 && lat < 15 && lng > -82 && lng < -32) return true;
     
     // Europe
-    if (lat > 35 && lat < 72) {
-      // Western Europe
-      if (lng > -12 && lng < 25 && lat > 35 && lat < 60) return true;
-      // Scandinavia
-      if (lng > 5 && lng < 30 && lat > 55 && lat < 72) return true;
-      // Eastern Europe
-      if (lng > 20 && lng < 60 && lat > 40 && lat < 70) return true;
-    }
-    // UK & Ireland
-    if (lat > 50 && lat < 60 && lng > -11 && lng < 2) return true;
+    if (lat > 35 && lat < 72 && lng > -12 && lng < 65) return true;
     
     // Africa
-    if (lat > -35 && lat < 37) {
-      if (lng > -18 && lng < 52) {
-        // North Africa
-        if (lat > 15 && lat < 37 && lng > -18 && lng < 40) return true;
-        // West Africa
-        if (lat > 4 && lat < 20 && lng > -18 && lng < 15) return true;
-        // Central/East Africa
-        if (lat > -15 && lat < 15 && lng > 10 && lng < 52) return true;
-        // Southern Africa
-        if (lat > -35 && lat < -10 && lng > 15 && lng < 40) return true;
-      }
-    }
+    if (lat > -36 && lat < 38 && lng > -20 && lng < 55) return true;
     
-    // Middle East
-    if (lat > 12 && lat < 42 && lng > 34 && lng < 65) return true;
+    // Middle East & Central Asia
+    if (lat > 10 && lat < 45 && lng > 25 && lng < 75) return true;
     
-    // Asia
-    if (lat > 5 && lat < 77) {
-      // Russia/Siberia
-      if (lat > 50 && lat < 77 && lng > 60 && lng < 180) return true;
-      // Central Asia
-      if (lat > 35 && lat < 55 && lng > 50 && lng < 90) return true;
-      // India subcontinent
-      if (lat > 8 && lat < 35 && lng > 68 && lng < 92) return true;
-      // Southeast Asia mainland
-      if (lat > 10 && lat < 30 && lng > 92 && lng < 110) return true;
-      // China
-      if (lat > 20 && lat < 55 && lng > 75 && lng < 135) return true;
-      // Korea
-      if (lat > 33 && lat < 43 && lng > 124 && lng < 132) return true;
-    }
+    // Russia/Siberia
+    if (lat > 45 && lat < 78 && lng > 25 && lng < 180) return true;
+    
+    // India
+    if (lat > 6 && lat < 36 && lng > 68 && lng < 98) return true;
+    
+    // Southeast Asia
+    if (lat > -10 && lat < 30 && lng > 92 && lng < 145) return true;
+    
+    // China & East Asia
+    if (lat > 18 && lat < 55 && lng > 73 && lng < 145) return true;
     
     // Japan
-    if (lat > 30 && lat < 46 && lng > 128 && lng < 146) return true;
-    
-    // Indonesia/SE Asia islands
-    if (lat > -10 && lat < 8 && lng > 95 && lng < 142) return true;
-    
-    // Philippines
-    if (lat > 5 && lat < 20 && lng > 117 && lng < 127) return true;
+    if (lat > 30 && lat < 46 && lng > 128 && lng < 148) return true;
     
     // Australia
-    if (lat > -45 && lat < -10 && lng > 112 && lng < 155) return true;
+    if (lat > -45 && lat < -10 && lng > 110 && lng < 158) return true;
     
     // New Zealand
-    if (lat > -47 && lat < -34 && lng > 166 && lng < 179) return true;
+    if (lat > -48 && lat < -33 && lng > 165 && lng < 180) return true;
     
     // Greenland
-    if (lat > 60 && lat < 84 && lng > -73 && lng < -12) return true;
+    if (lat > 59 && lat < 84 && lng > -75 && lng < -10) return true;
     
     return false;
   };
 
-  // Generate denser dot grid
-  const latStep = 1.8;
-  const lngStep = 1.8;
+  // Create grid pattern - consistent spacing
+  const step = 3;
   
-  for (let lat = -60; lat <= 80; lat += latStep) {
-    for (let lng = -180; lng <= 180; lng += lngStep) {
-      if (isInsideContinent(lat, lng)) {
-        dots.push({ lat, lng });
-      }
+  for (let lat = -70; lat <= 75; lat += step) {
+    for (let lng = -180; lng <= 180; lng += step) {
+      const type = isLand(lat, lng) ? 'land' : 'grid';
+      dots.push({ lat, lng, type });
     }
   }
   
@@ -239,8 +187,8 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
     });
   }, [nodes]);
 
-  // Pre-generate continent dots
-  const continentDots = useMemo(() => generateContinentDots(), []);
+  // Pre-generate globe grid
+  const globeGridDots = useMemo(() => generateGlobeGrid(), []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -290,36 +238,37 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
     const baseSphere = new THREE.Mesh(earthGeometry, baseMaterial);
     globe.add(baseSphere);
 
-    // Very subtle latitude/longitude grid
-    const gridGeometry = new THREE.SphereGeometry(earthRadius * 1.001, 36, 18);
-    const gridMaterial = new THREE.MeshBasicMaterial({
+    // Remove wireframe grid - use dots only like reference
+    
+    // Create globe dots group
+    const globeDotsGroup = new THREE.Group();
+    globe.add(globeDotsGroup);
+
+    // Dot materials - land vs ocean grid
+    const landDotGeometry = new THREE.CircleGeometry(0.012, 8);
+    const landDotMaterial = new THREE.MeshBasicMaterial({
       color: tealColor,
-      wireframe: true,
       transparent: true,
-      opacity: 0.05,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
     });
-    const gridSphere = new THREE.Mesh(gridGeometry, gridMaterial);
-    globe.add(gridSphere);
-
-    // Create continent dots group
-    const continentDotsGroup = new THREE.Group();
-    globe.add(continentDotsGroup);
-
-    // Use instanced mesh for better performance with many dots
-    const dotGeometry = new THREE.CircleGeometry(0.008, 6);
-    const dotMaterial = new THREE.MeshBasicMaterial({
+    
+    const gridDotGeometry = new THREE.CircleGeometry(0.006, 6);
+    const gridDotMaterial = new THREE.MeshBasicMaterial({
       color: tealColor,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.15,
       side: THREE.DoubleSide,
     });
 
-    continentDots.forEach((dot) => {
+    globeGridDots.forEach((dot) => {
       const position = latLngToVector3(dot.lat, dot.lng, earthRadius * 1.002);
-      const dotMesh = new THREE.Mesh(dotGeometry, dotMaterial);
+      const geometry = dot.type === 'land' ? landDotGeometry : gridDotGeometry;
+      const material = dot.type === 'land' ? landDotMaterial : gridDotMaterial;
+      const dotMesh = new THREE.Mesh(geometry, material);
       dotMesh.position.copy(position);
       dotMesh.lookAt(new THREE.Vector3(0, 0, 0));
-      continentDotsGroup.add(dotMesh);
+      globeDotsGroup.add(dotMesh);
     });
 
     // Outer glow
@@ -587,7 +536,7 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
       }
       rendererRef.current?.dispose();
     };
-  }, [nodeLocations, continentDots]);
+  }, [nodeLocations, globeGridDots]);
 
   // Calculate stats
   const onlineCount = nodeLocations.filter(n => n.status === 'online').length;
