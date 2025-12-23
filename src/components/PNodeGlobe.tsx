@@ -60,93 +60,124 @@ const mockNodeLocations: PNodeLocation[] = [
   { id: 'node-32', lat: 6.5244, lng: 3.3792, status: 'syncing', stake: 1500 },
 ];
 
-// Continent outline coordinates (simplified for dot pattern)
-const continentData = [
-  // North America outline
-  { points: [
-    [70, -170], [72, -130], [70, -100], [60, -95], [55, -80], [45, -65], [40, -75], [30, -85],
-    [25, -80], [20, -90], [15, -95], [20, -105], [25, -110], [30, -115], [35, -120], [40, -125],
-    [48, -125], [55, -130], [60, -145], [65, -165], [70, -170]
-  ]},
-  // South America outline
-  { points: [
-    [10, -80], [5, -77], [0, -80], [-5, -80], [-10, -75], [-20, -70], [-25, -65], [-30, -60],
-    [-40, -65], [-50, -70], [-55, -68], [-55, -75], [-45, -75], [-35, -55], [-25, -45], [-10, -35],
-    [-5, -50], [0, -50], [5, -60], [10, -75], [10, -80]
-  ]},
-  // Europe outline
-  { points: [
-    [70, -10], [70, 30], [65, 40], [60, 30], [55, 20], [50, 5], [45, 0], [40, -5], [35, -10],
-    [35, 0], [40, 20], [45, 25], [50, 40], [55, 35], [60, 45], [65, 50], [70, 40], [70, -10]
-  ]},
-  // Africa outline
-  { points: [
-    [35, -10], [30, 0], [25, 10], [15, 10], [10, 5], [5, 0], [0, 10], [-5, 15], [-15, 20],
-    [-25, 30], [-35, 20], [-35, 25], [-30, 30], [-20, 35], [-10, 40], [0, 45], [10, 50],
-    [20, 40], [30, 35], [35, 30], [35, -10]
-  ]},
-  // Asia outline
-  { points: [
-    [70, 40], [75, 80], [75, 100], [70, 140], [65, 170], [60, 160], [55, 140], [50, 130],
-    [45, 140], [40, 130], [35, 120], [30, 120], [25, 105], [20, 100], [15, 100], [10, 105],
-    [5, 100], [0, 105], [5, 115], [15, 120], [25, 120], [30, 130], [35, 135], [40, 145],
-    [45, 145], [50, 150], [55, 160], [65, 170], [70, 180], [75, 170], [75, 140], [70, 40]
-  ]},
-  // Australia outline
-  { points: [
-    [-15, 125], [-20, 115], [-25, 115], [-30, 115], [-35, 120], [-38, 145], [-35, 150],
-    [-30, 155], [-25, 150], [-20, 145], [-15, 140], [-12, 135], [-15, 125]
-  ]},
-];
-
-// Generate dot pattern for continents
+// Generate detailed dot pattern for continents (more realistic world map)
 const generateContinentDots = (): { lat: number; lng: number }[] => {
   const dots: { lat: number; lng: number }[] = [];
   
-  // Helper to check if point is inside polygon (simplified)
+  // More precise continental boundaries using simplified polygon checks
   const isInsideContinent = (lat: number, lng: number): boolean => {
-    // Simplified continental boundaries
-    // North America
-    if (lat > 15 && lat < 72 && lng > -170 && lng < -50) return true;
+    // North America (main landmass)
+    if (lat > 25 && lat < 72) {
+      if (lng > -170 && lng < -50) {
+        // Western USA/Canada
+        if (lat > 48 && lng > -140 && lng < -110) return true;
+        // Alaska
+        if (lat > 58 && lng > -170 && lng < -130) return true;
+        // Canada middle
+        if (lat > 50 && lat < 70 && lng > -130 && lng < -60) return true;
+        // USA main
+        if (lat > 25 && lat < 50 && lng > -125 && lng < -65) return true;
+        // East coast curve
+        if (lat > 25 && lat < 45 && lng > -82 && lng < -65) return true;
+      }
+    }
+    // Mexico & Central America
+    if (lat > 8 && lat < 32 && lng > -118 && lng < -85) return true;
+    
     // South America  
-    if (lat > -57 && lat < 12 && lng > -82 && lng < -35) return true;
+    if (lat > -56 && lat < 12) {
+      if (lng > -82 && lng < -34) {
+        // Northern part (wider)
+        if (lat > -5 && lat < 12 && lng > -80 && lng < -50) return true;
+        // Brazil
+        if (lat > -25 && lat < 5 && lng > -75 && lng < -34) return true;
+        // Southern cone
+        if (lat > -56 && lat < -20 && lng > -75 && lng < -50) return true;
+        // Chile
+        if (lat > -56 && lat < -18 && lng > -78 && lng < -66) return true;
+      }
+    }
+    
     // Europe
-    if (lat > 35 && lat < 72 && lng > -12 && lng < 60) return true;
+    if (lat > 35 && lat < 72) {
+      // Western Europe
+      if (lng > -12 && lng < 25 && lat > 35 && lat < 60) return true;
+      // Scandinavia
+      if (lng > 5 && lng < 30 && lat > 55 && lat < 72) return true;
+      // Eastern Europe
+      if (lng > 20 && lng < 60 && lat > 40 && lat < 70) return true;
+    }
+    // UK & Ireland
+    if (lat > 50 && lat < 60 && lng > -11 && lng < 2) return true;
+    
     // Africa
-    if (lat > -35 && lat < 37 && lng > -18 && lng < 52) return true;
+    if (lat > -35 && lat < 37) {
+      if (lng > -18 && lng < 52) {
+        // North Africa
+        if (lat > 15 && lat < 37 && lng > -18 && lng < 40) return true;
+        // West Africa
+        if (lat > 4 && lat < 20 && lng > -18 && lng < 15) return true;
+        // Central/East Africa
+        if (lat > -15 && lat < 15 && lng > 10 && lng < 52) return true;
+        // Southern Africa
+        if (lat > -35 && lat < -10 && lng > 15 && lng < 40) return true;
+      }
+    }
+    
+    // Middle East
+    if (lat > 12 && lat < 42 && lng > 34 && lng < 65) return true;
+    
     // Asia
-    if (lat > 5 && lat < 77 && lng > 60 && lng < 180) return true;
-    if (lat > 25 && lat < 45 && lng > 25 && lng < 60) return true;
+    if (lat > 5 && lat < 77) {
+      // Russia/Siberia
+      if (lat > 50 && lat < 77 && lng > 60 && lng < 180) return true;
+      // Central Asia
+      if (lat > 35 && lat < 55 && lng > 50 && lng < 90) return true;
+      // India subcontinent
+      if (lat > 8 && lat < 35 && lng > 68 && lng < 92) return true;
+      // Southeast Asia mainland
+      if (lat > 10 && lat < 30 && lng > 92 && lng < 110) return true;
+      // China
+      if (lat > 20 && lat < 55 && lng > 75 && lng < 135) return true;
+      // Korea
+      if (lat > 33 && lat < 43 && lng > 124 && lng < 132) return true;
+    }
+    
+    // Japan
+    if (lat > 30 && lat < 46 && lng > 128 && lng < 146) return true;
+    
+    // Indonesia/SE Asia islands
+    if (lat > -10 && lat < 8 && lng > 95 && lng < 142) return true;
+    
+    // Philippines
+    if (lat > 5 && lat < 20 && lng > 117 && lng < 127) return true;
+    
     // Australia
     if (lat > -45 && lat < -10 && lng > 112 && lng < 155) return true;
-    // Indonesia/SE Asia islands
-    if (lat > -10 && lat < 8 && lng > 95 && lng < 140) return true;
-    // Japan
-    if (lat > 30 && lat < 45 && lng > 128 && lng < 146) return true;
-    // UK/Ireland
-    if (lat > 50 && lat < 60 && lng > -11 && lng < 2) return true;
+    
+    // New Zealand
+    if (lat > -47 && lat < -34 && lng > 166 && lng < 179) return true;
+    
+    // Greenland
+    if (lat > 60 && lat < 84 && lng > -73 && lng < -12) return true;
     
     return false;
   };
 
-  // Generate dot grid
-  const latStep = 2.5;
-  const lngStep = 2.5;
+  // Generate denser dot grid
+  const latStep = 1.8;
+  const lngStep = 1.8;
   
-  for (let lat = -60; lat <= 75; lat += latStep) {
+  for (let lat = -60; lat <= 80; lat += latStep) {
     for (let lng = -180; lng <= 180; lng += lngStep) {
       if (isInsideContinent(lat, lng)) {
-        // Add some randomness to make it look more organic
-        const jitterLat = (Math.random() - 0.5) * 1;
-        const jitterLng = (Math.random() - 0.5) * 1;
-        dots.push({ lat: lat + jitterLat, lng: lng + jitterLng });
+        dots.push({ lat, lng });
       }
     }
   }
   
   return dots;
 };
-
 // Convert lat/lng to 3D coordinates on sphere
 const latLngToVector3 = (lat: number, lng: number, radius: number): THREE.Vector3 => {
   const phi = (90 - lat) * (Math.PI / 180);
@@ -245,41 +276,41 @@ export const PNodeGlobe: React.FC<PNodeGlobeProps> = ({ nodes }) => {
     // Xandeum theme colors
     const tealColor = new THREE.Color('hsl(168, 80%, 45%)');
     const orangeColor = new THREE.Color('hsl(35, 95%, 55%)');
-    const purpleColor = new THREE.Color('hsl(290, 60%, 50%)');
 
     // Earth sphere base
     const earthRadius = 1;
     const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
     
-    // Semi-transparent base sphere
+    // Clean dark base sphere (like the reference image)
     const baseMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color('hsl(220, 25%, 12%)'),
+      color: new THREE.Color('hsl(220, 30%, 8%)'),
       transparent: true,
-      opacity: 0.9,
+      opacity: 1,
     });
     const baseSphere = new THREE.Mesh(earthGeometry, baseMaterial);
     globe.add(baseSphere);
 
-    // Latitude/Longitude grid lines (subtle)
-    const gridGeometry = new THREE.SphereGeometry(earthRadius * 1.001, 48, 24);
+    // Very subtle latitude/longitude grid
+    const gridGeometry = new THREE.SphereGeometry(earthRadius * 1.001, 36, 18);
     const gridMaterial = new THREE.MeshBasicMaterial({
       color: tealColor,
       wireframe: true,
       transparent: true,
-      opacity: 0.08,
+      opacity: 0.05,
     });
     const gridSphere = new THREE.Mesh(gridGeometry, gridMaterial);
     globe.add(gridSphere);
 
-    // Create continent dots
+    // Create continent dots group
     const continentDotsGroup = new THREE.Group();
     globe.add(continentDotsGroup);
 
-    const dotGeometry = new THREE.CircleGeometry(0.012, 8);
+    // Use instanced mesh for better performance with many dots
+    const dotGeometry = new THREE.CircleGeometry(0.008, 6);
     const dotMaterial = new THREE.MeshBasicMaterial({
       color: tealColor,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.7,
       side: THREE.DoubleSide,
     });
 
