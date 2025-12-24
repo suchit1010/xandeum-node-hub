@@ -1,3 +1,4 @@
+
 import { Server, Activity, Wifi, TrendingUp, Copy, Star, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,8 +94,8 @@ export function PNodeGrid({ nodes }: PNodeGridProps) {
 
           <div className="flex items-center justify-between text-sm border-t border-border/50 pt-3">
             <div className="flex items-center gap-1 text-muted-foreground">
-              <Wifi className="h-3 w-3" />
-              <span>{node.peers} peers</span>
+                <Wifi className="h-3 w-3" />
+                <span>{node.peers === null || node.peers === undefined ? 'N/A' : `${node.peers} peers`}</span>
             </div>
             <div className="font-mono font-medium text-primary">
               {(node.stake / 1000).toFixed(1)}K staked

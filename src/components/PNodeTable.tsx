@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   ArrowUpDown, 
   ArrowUp, 
@@ -52,8 +52,10 @@ export interface PNode {
   uptime: number;
   capacity: number;
   peers: number;
-  lastSeen: Date;
+  lastSeen: Date | string;
   region: string;
+  pubkey?: string;
+  country?: string;
   version: string;
   stake: number;
   isTop: boolean;
@@ -61,6 +63,7 @@ export interface PNode {
 
 interface PNodeTableProps {
   nodes: PNode[];
+  onViewDetails?: (node: PNode) => void;
 }
 
 type SortField = "uptime" | "capacity" | "peers" | "stake" | "lastSeen";
@@ -68,11 +71,28 @@ type SortDirection = "asc" | "desc";
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
-export function PNodeTable({ nodes }: PNodeTableProps) {
+export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
   const [sortField, setSortField] = useState<SortField>("stake");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [globeFilter, setGlobeFilter] = useState<string | null>(null);
+
+  // listen for globe selection events to filter table by region/country
+  useEffect(() => {
+    const handler = (e: Event) => {
+        try {
+          const d = (e as CustomEvent)?.detail;
+          if (!d) return;
+          const name = d.name || d.region || (d.nodes && d.nodes[0]?.region) || null;
+          if (name) setGlobeFilter(String(name));
+        } catch (err) {
+          // ignore
+        }
+      };
+      window.addEventListener('xandeum:globe-select', handler as EventListener);
+      return () => window.removeEventListener('xandeum:globe-select', handler as EventListener);
+  }, []);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -84,15 +104,37 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
     setCurrentPage(1); // Reset to first page on sort
   };
 
-  const sortedNodes = useMemo(() => {
-    return [...nodes].sort((a, b) => {
-      const multiplier = sortDirection === "asc" ? 1 : -1;
-      if (sortField === "lastSeen") {
-        return (a.lastSeen.getTime() - b.lastSeen.getTime()) * multiplier;
-      }
-      return (a[sortField] - b[sortField]) * multiplier;
+  const filteredNodes = useMemo(() => {
+    if (!globeFilter) return nodes;
+    const f = globeFilter.toLowerCase();
+    return nodes.filter((n) => {
+      const region = (n.region || "").toLowerCase();
+      const country = ((n as any).country || "").toLowerCase();
+      return region.includes(f) || country.includes(f) || String(n.id).toLowerCase().includes(f);
     });
-  }, [nodes, sortField, sortDirection]);
+  }, [nodes, globeFilter]);
+
+  const maxCapacity = useMemo(() => {
+    return Math.max(1, ...nodes.map(n => Number(n.capacity) || 0));
+  }, [nodes]);
+
+  const sortedNodes = useMemo(() => {
+    const getFieldValue = (node: PNode, field: SortField) => {
+      if (field === 'lastSeen') return new Date(node.lastSeen).getTime();
+      if (field === 'uptime') return Number(node.uptime ?? 0);
+      if (field === 'capacity') return Number(node.capacity ?? 0);
+      if (field === 'peers') return Number(node.peers ?? 0);
+      if (field === 'stake') return Number(node.stake ?? 0);
+      return 0;
+    };
+
+    return [...filteredNodes].sort((a, b) => {
+      const multiplier = sortDirection === "asc" ? 1 : -1;
+      const av = getFieldValue(a, sortField);
+      const bv = getFieldValue(b, sortField);
+      return (av - bv) * multiplier;
+    });
+  }, [filteredNodes, sortField, sortDirection]);
 
   // Pagination
   const totalPages = Math.ceil(sortedNodes.length / rowsPerPage);
@@ -115,6 +157,61 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
     toast({ title: "Address copied to clipboard" });
   };
 
+  const copyPubkey = (pubkey: string) => {
+    navigator.clipboard.writeText(pubkey);
+    toast({ title: "Pubkey copied to clipboard" });
+  };
+
+  // Export sorted + filtered view (not paginated) — listen for global export event
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const headers = ["ID", "Address", "Status", "Uptime", "Capacity", "Peers", "Stake", "Version", "Region"];
+        const rows = sortedNodes.map(n => [n.id, n.address, n.status, n.uptime, n.capacity, n.peers, n.stake, n.version, n.region]);
+        const csvContent = [headers, ...rows]
+          .map(r => r.map(c => String(c ?? '').replace(/"/g, '""')).map(c => `"${c}"`).join(','))
+          .join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `xandeum-pnodes-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: 'Exported CSV', description: `${sortedNodes.length} rows exported` });
+      } catch (e) {
+        console.error('Export failed', e);
+        toast({ title: 'Export failed' });
+      }
+    };
+    window.addEventListener('xandeum:export-csv', handler);
+
+    const jsonHandler = () => {
+      try {
+        const payload = sortedNodes.map(n => ({ id: n.id, address: n.address, status: n.status, uptime: n.uptime, capacity: n.capacity, peers: n.peers, stake: n.stake, version: n.version, region: n.region }));
+        const jsonContent = JSON.stringify(payload, null, 2);
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `xandeum-pnodes-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: 'Exported JSON', description: `${sortedNodes.length} rows exported` });
+      } catch (e) {
+        console.error('JSON export failed', e);
+        toast({ title: 'Export failed' });
+      }
+    };
+
+    window.addEventListener('xandeum:export-json', jsonHandler);
+
+    return () => {
+      window.removeEventListener('xandeum:export-csv', handler);
+      window.removeEventListener('xandeum:export-json', jsonHandler);
+    };
+  }, [sortedNodes]);
+
   const getStatusBadge = (status: PNode["status"]) => {
     const styles = {
       online: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -132,8 +229,11 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
     );
   };
 
-  const formatTimeSince = (date: Date) => {
-    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  const formatTimeSince = (date: Date | string | number | null) => {
+    // Accept Date, string, number, or null; normalize to Date
+    const d = date instanceof Date ? date : (date ? new Date(date as any) : null);
+    if (!d || Number.isNaN(d.getTime())) return '—';
+    const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     return `${Math.floor(seconds / 3600)}h ago`;
@@ -158,6 +258,15 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
           <span>of</span>
           <span className="font-semibold text-foreground">{sortedNodes.length}</span>
           <span>pNodes</span>
+          {globeFilter && (
+            <div className="ml-3 inline-flex items-center gap-2 bg-secondary/40 border border-border rounded-full px-3 py-1 text-xs text-foreground">
+              <span className="font-medium">Filter:</span>
+              <span className="font-mono">{globeFilter}</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setGlobeFilter(null); setCurrentPage(1); }}>
+                ✕
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Rows:</span>
@@ -210,6 +319,7 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
                   Peers <SortIcon field="peers" />
                 </Button>
               </TableHead>
+              <TableHead className="hidden md:table-cell">Credits</TableHead>
               <TableHead>
                 <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("stake")}>
                   Stake <SortIcon field="stake" />
@@ -235,6 +345,7 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
                   <div className="flex flex-col">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-medium">{node.id}</span>
+                      <button onClick={() => copyPubkey(node.id)} className="ml-2 text-xs text-muted-foreground hover:text-foreground">Copy pubkey</button>
                       {node.isTop && <Shield className="h-3 w-3 text-primary" />}
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
@@ -258,22 +369,22 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   <div className="space-y-1">
-                    <span className="font-medium">{node.capacity}%</span>
+                    <span className="font-medium">{Number(node.capacity).toFixed(1)} GB</span>
                     <div className="progress-bar w-20">
                       <div 
                         className="progress-bar-fill" 
                         style={{ 
-                          width: `${node.capacity}%`,
-                          background: node.capacity > 80 ? 
-                            "linear-gradient(135deg, hsl(35 95% 55%), hsl(20 90% 50%))" :
-                            undefined
+                          width: `${Math.min(100, Math.round((Number(node.capacity) / maxCapacity) * 100))}%`,
                         }} 
                       />
                     </div>
                   </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <span className="font-mono">{node.peers}</span>
+                  <span className="font-mono">{node.peers === null || node.peers === undefined ? 'N/A' : node.peers}</span>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <span className="font-mono">{node.stake ?? 0}</span>
                 </TableCell>
                 <TableCell>
                   <span className="font-mono text-primary font-medium">
@@ -298,10 +409,10 @@ export function PNodeTable({ nodes }: PNodeTableProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover border-border">
-                      <DropdownMenuItem className="cursor-pointer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
+                              <DropdownMenuItem className="cursor-pointer" onClick={() => onViewDetails && onViewDetails(node)}>
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
                       <DropdownMenuItem className="cursor-pointer">
                         <Star className="h-4 w-4 mr-2" />
                         Add to Watchlist

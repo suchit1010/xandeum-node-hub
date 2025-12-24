@@ -15,10 +15,14 @@ interface FilterBarProps {
   setStatusFilter: (value: string) => void;
   regionFilter: string;
   setRegionFilter: (value: string) => void;
+  versionFilter?: string;
+  setVersionFilter?: (v: string) => void;
+  versions?: string[];
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   viewMode: "table" | "grid";
   setViewMode: (mode: "table" | "grid") => void;
+  onExport?: () => void;
 }
 
 export function FilterBar({
@@ -26,6 +30,9 @@ export function FilterBar({
   setStatusFilter,
   regionFilter,
   setRegionFilter,
+  versionFilter,
+  setVersionFilter,
+  versions,
   searchQuery,
   setSearchQuery,
   viewMode,
@@ -69,6 +76,21 @@ export function FilterBar({
           </SelectContent>
         </Select>
 
+        {/* Version filter (optional) */}
+        {versions && setVersionFilter && (
+          <Select value={versionFilter} onValueChange={setVersionFilter}>
+            <SelectTrigger className="w-[160px] bg-secondary/50 border-border/50">
+              <SelectValue placeholder="Version" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="all">All Versions</SelectItem>
+              {versions.map(v => (
+                <SelectItem key={v} value={v}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <div className="flex border border-border/50 rounded-lg overflow-hidden">
           <Button
             variant={viewMode === "table" ? "secondary" : "ghost"}
@@ -88,7 +110,7 @@ export function FilterBar({
           </Button>
         </div>
 
-        <Button variant="outline" className="border-border/50">
+        <Button variant="outline" className="border-border/50" onClick={() => onExport && onExport()}>
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>

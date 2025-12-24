@@ -3,6 +3,10 @@ const fetch = require('node-fetch');
 const app = express();
 app.use(express.json());
 
+// Simple in-memory geo cache: ip -> { region, expiresAt }
+const GEO_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const geoCache = new Map();
+
 // Helper: fetch with timeout using AbortController
 async function fetchWithTimeout(url, options = {}, timeout = 15000) {
   const controller = new AbortController();
@@ -42,6 +46,64 @@ app.post('/api/prpc-proxy', async (req, res) => {
       // Try parse JSON, but if remote returns non-json, return raw text for debugging
       try {
         const data = JSON.parse(text);
+
+        // If data contains pods, try to enrich with region lookup (best-effort, cached)
+        if (data && data.result && Array.isArray(data.result.pods)) {
+          const pods = data.result.pods;
+          const uniqueIps = new Set();
+          pods.forEach(p => {
+            if (p && p.address) {
+              const ip = String(p.address).split(':')[0].replace(/\[|\]/g, '');
+              if (ip) uniqueIps.add(ip);
+            }
+          });
+
+          const lookups = Array.from(uniqueIps).map(async (ip) => {
+            try {
+              const cached = geoCache.get(ip);
+              if (cached && cached.expiresAt > Date.now()) return { ip, region: cached.region };
+              // use ip-api.com for simple free geolocation
+              const geoResp = await fetchWithTimeout(`http://ip-api.com/json/${ip}?fields=country,regionName,city`, {}, 3500);
+              const geoJson = await geoResp.json();
+              const region = [geoJson.regionName, geoJson.country].filter(Boolean).join(', ');
+              geoCache.set(ip, { region, expiresAt: Date.now() + GEO_TTL_MS });
+              return { ip, region };
+            } catch (err) {
+              return { ip, region: null };
+            }
+          });
+
+          try {
+            const results = await Promise.allSettled(lookups);
+            const regionMap = new Map();
+            results.forEach(r => {
+              if (r.status === 'fulfilled' && r.value && r.value.region) regionMap.set(r.value.ip, r.value.region);
+            });
+            pods.forEach(p => {
+              if (p && p.address) {
+                const ip = String(p.address).split(':')[0].replace(/\[|\]/g, '');
+                if (regionMap.has(ip)) p.region = regionMap.get(ip);
+              }
+            });
+            data.result.pods = pods;
+
+            // Compute aggregated region counts to reduce client-side work
+            try {
+              const regionCounts = {};
+              pods.forEach(p => {
+                const r = p && p.region ? p.region : 'Unknown';
+                regionCounts[r] = (regionCounts[r] || 0) + 1;
+              });
+              data.meta = data.meta || {};
+              data.meta.regionCounts = regionCounts;
+            } catch (err) {
+              // ignore
+            }
+          } catch (err) {
+            // ignore geo enrichment failures
+            console.warn('Geo enrichment failed', err);
+          }
+        }
         return res.status(response.status >= 400 ? 502 : 200).json(data);
       } catch (parseErr) {
         // Non-JSON body

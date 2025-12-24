@@ -8,10 +8,12 @@ import {
 import {
   TrendingUp, TrendingDown, Globe, Cpu, Clock, Activity,
   Zap, Database, Users, ArrowUpRight, ArrowDownRight,
-  Calendar, Download, Filter, Map, FileJson, FileSpreadsheet,
+  Calendar, Download, Filter, /* Map, */ FileJson, FileSpreadsheet,
   Info, AlertCircle, CheckCircle
 } from "lucide-react";
-import { NetworkGlobe } from "@/components/NetworkGlobe";
+import React, { Suspense } from 'react';
+import { countryCentroids } from '@/lib/geo';
+const GlobeLazy = React.lazy(() => import('./GlobeClean'));
 import { Button } from "@/components/ui/button";
 import {
   Tooltip as TooltipUI,
@@ -26,15 +28,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PNode } from "@/components/PNodeTable";
+import { computeNetworkHealth } from "@/lib/stats";
 import { toast } from "@/hooks/use-toast";
 
 interface AnalyticsTabProps {
   nodes: PNode[];
+  coverageAttempted?: number | null;
+  coverageResponded?: number | null;
 }
 
-export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
+export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded = 0 }: AnalyticsTabProps) {
   const [selectedTimeRange, setSelectedTimeRange] = useState("7d");
-  const [regionFilter, setRegionFilter] = useState<string | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [hoveredName, setHoveredName] = useState<string | null>(null);
+  const [showOtherDetails, setShowOtherDetails] = useState(false);
 
   const handleGlobeLocationClick = useCallback((region: string) => {
     setRegionFilter(prev => prev === region ? null : region);
@@ -46,34 +53,74 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
     return nodes.filter(n => n.region === regionFilter);
   }, [nodes, regionFilter]);
   // Regional Distribution Data
-  const regionalData = useMemo(() => {
-    const regions = nodes.reduce((acc, node) => {
-      acc[node.region] = (acc[node.region] || 0) + 1;
+  const { pieData: regionalData, otherList: regionalOtherList, total: regionalTotal } = useMemo(() => {
+    const counts = nodes.reduce((acc, node) => {
+      const r = node.region || 'Unknown';
+      acc[r] = (acc[r] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
-    return Object.entries(regions).map(([name, value]) => ({
-      name,
-      value,
-      fill: name === "North America" ? "hsl(168 80% 45%)" : 
-            name === "Europe" ? "hsl(270 70% 60%)" : 
-            name === "Asia" ? "hsl(35 95% 55%)" : "hsl(200 80% 50%)"
+
+    const entries = Object.entries(counts).map(([name, value]) => ({ name, value }));
+    entries.sort((a, b) => b.value - a.value);
+    const topN = 6; // show top 5-7 as requested; using 6 here
+    const top = entries.slice(0, topN);
+    const other = entries.slice(topN);
+    const otherCount = other.reduce((s, e) => s + e.value, 0);
+
+    // reduced, high-contrast palette
+    const palette = [
+      'hsl(200 80% 50%)',
+      'hsl(168 80% 45%)',
+      'hsl(270 70% 60%)',
+      'hsl(35 95% 55%)',
+      'hsl(300 70% 55%)',
+      'hsl(40 80% 50%)',
+    ];
+
+    const mapped = top.map((e, i) => ({
+      name: e.name,
+      value: e.value,
+      fill: palette[i % palette.length],
     }));
+
+    if (otherCount > 0) mapped.push({ name: `Other (${other.length})`, value: otherCount, fill: 'hsl(220 20% 30%)' });
+
+    return { pieData: mapped, otherList: other, total: entries.reduce((s, e) => s + e.value, 0) };
   }, [nodes]);
 
-  // Performance Over Time (mock 7 days)
-  const performanceData = useMemo(() => 
-    Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
+  // Performance Over Time derived from real node lastSeen timestamps (7 days)
+  const performanceData = useMemo(() => {
+    const now = new Date();
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setHours(0,0,0,0);
+      d.setDate(d.getDate() - (6 - i));
+      return d;
+    });
+
+    const totalNodes = nodes.length || 0;
+
+    return days.map((d) => {
+      const start = new Date(d);
+      const end = new Date(d);
+      end.setDate(end.getDate() + 1);
+      const seenNodes = nodes.filter(n => {
+        const ls = n.lastSeen ? new Date(n.lastSeen) : null;
+        return ls && ls >= start && ls < end;
+      });
+      const nodesCount = seenNodes.length;
+      const uptime = nodesCount > 0 ? Math.round((seenNodes.reduce((s, n) => s + (Number(n.uptime) || 0), 0) / nodesCount) * 10) / 10 : (totalNodes > 0 ? Math.round((nodes.reduce((s, n) => s + (Number(n.uptime) || 0), 0) / totalNodes) * 10) / 10 : 0);
+      const capacity = nodesCount > 0 ? Math.round((seenNodes.reduce((s, n) => s + (Number(n.capacity) || 0), 0) / nodesCount) * 10) / 10 : (totalNodes > 0 ? Math.round((nodes.reduce((s, n) => s + (Number(n.capacity) || 0), 0) / totalNodes) * 10) / 10 : 0);
+      const responseTime = nodesCount > 0 ? Math.round((seenNodes.reduce((s, n) => s + (Number(n.peers) || 0), 0) / nodesCount)) : 0;
       return {
-        date: date.toLocaleDateString("en-US", { weekday: "short" }),
-        uptime: Math.floor(Math.random() * 3) + 97,
-        capacity: Math.floor(Math.random() * 15) + 65,
-        responseTime: Math.floor(Math.random() * 15) + 25,
+        date: d.toLocaleDateString("en-US", { weekday: "short" }),
+        uptime,
+        capacity,
+        responseTime,
+        nodes: nodesCount,
       };
-    })
-  , []);
+    });
+  }, [nodes]);
 
   // Capacity Utilization
   const capacityData = useMemo(() => [
@@ -83,14 +130,18 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
     { name: "76-100%", count: nodes.filter(n => n.capacity > 75).length, fill: "hsl(0 84% 60%)" },
   ], [nodes]);
 
-  // Hourly Traffic Pattern
-  const trafficData = useMemo(() =>
-    Array.from({ length: 24 }, (_, i) => ({
-      hour: `${String(i).padStart(2, "0")}:00`,
-      requests: Math.floor(Math.random() * 5000) + 2000,
-      errors: Math.floor(Math.random() * 50),
-    }))
-  , []);
+  // Hourly Traffic Pattern derived from nodes' lastSeen timestamps
+  const trafficData = useMemo(() => {
+    const hours = Array.from({ length: 24 }, (_, i) => ({ hour: `${String(i).padStart(2, "0")}:00`, requests: 0, errors: 0 }));
+    nodes.forEach(n => {
+      const ls = n.lastSeen ? new Date(n.lastSeen) : null;
+      if (!ls) return;
+      const h = ls.getHours();
+      hours[h].requests += 1;
+      if (n.status === 'offline') hours[h].errors += 1;
+    });
+    return hours;
+  }, [nodes]);
 
   // Version Distribution
   const versionData = useMemo(() => {
@@ -108,14 +159,12 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
     })).sort((a, b) => b.count - a.count).slice(0, 5);
   }, [nodes]);
 
-  // Network Health Score
-  const healthScore = useMemo(() => {
-    const online = nodes.filter(n => n.status === "online").length / nodes.length;
-    const avgUptime = nodes.reduce((acc, n) => acc + n.uptime, 0) / nodes.length / 100;
-    const avgCapacity = nodes.reduce((acc, n) => acc + n.capacity, 0) / nodes.length / 100;
-    return Math.round((online * 0.4 + avgUptime * 0.4 + (1 - avgCapacity) * 0.2) * 100);
-  }, [nodes]);
-
+  // Network Health Score (canonical) - include probe coverage so trust can be determined
+  const health = useMemo(() => computeNetworkHealth(nodes, {
+    attemptedEndpoints: coverageAttempted ?? 0,
+    respondedEndpoints: coverageResponded ?? 0,
+  }), [nodes, coverageAttempted, coverageResponded]);
+  const healthScore = health.networkHealth;
   const healthData = [{ name: "Health", value: healthScore, fill: "url(#healthGradient)" }];
 
   // Key Metrics
@@ -140,6 +189,35 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
     color: "hsl(210 20% 95%)"
   };
 
+  const [hoveredCapacityIndex, setHoveredCapacityIndex] = useState<number | null>(null);
+
+  const CapacityTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0].payload;
+    const total = nodes.length || 1;
+    const percent = ((data.count / total) * 100).toFixed(0);
+    return (
+      <div style={tooltipStyle} className="p-2 text-sm">
+        <div className="font-semibold">{data.name}</div>
+        <div>count: {data.count.toLocaleString()}</div>
+        <div className="text-muted-foreground">{percent}%</div>
+      </div>
+    );
+  };
+
+  // Custom Pie tooltip for count + percent
+  const PieTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0].payload;
+    const percent = ((data.value / Math.max(1, regionalTotal)) * 100).toFixed(0);
+    return (
+      <div style={tooltipStyle} className="p-2 text-sm">
+        <div className="font-semibold">{data.name}</div>
+        <div>{data.value.toLocaleString()} • {percent}%</div>
+      </div>
+    );
+  };
+
   // Export functions
   const exportToCSV = () => {
     const headers = ["ID", "Address", "Status", "Uptime", "Capacity", "Peers", "Stake", "Version", "Region"];
@@ -158,15 +236,13 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
   };
 
   const exportToJSON = () => {
-    const jsonContent = JSON.stringify(nodes, null, 2);
-    const blob = new Blob([jsonContent], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `xandeum-pnodes-${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Exported to JSON", description: `${nodes.length} pNodes exported successfully` });
+    // Trigger table to export current filtered+sorted view as JSON
+    try {
+      window.dispatchEvent(new Event('xandeum:export-json'));
+    } catch (e) {
+      console.error('Export JSON trigger failed', e);
+      toast({ title: 'Export failed' });
+    }
   };
 
   return (
@@ -307,40 +383,59 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
                 <TooltipTrigger asChild>
                   <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
-                <TooltipContent className="max-w-[200px] bg-popover border-border">
-                  <p>Composite score based on: 40% availability, 40% uptime, 20% capacity headroom</p>
+                <TooltipContent className="max-w-[260px] bg-popover border-border">
+                  <p>Network Health is a composite score computed as:</p>
+                  <ul className="list-inside list-disc text-sm">
+                    <li><strong>50%</strong> Availability (online / total)</li>
+                    <li><strong>30%</strong> Avg uptime (normalized)</li>
+                    <li><strong>20%</strong> Version freshness (percent on latest)</li>
+                  </ul>
+                  <p className="text-xs text-muted-foreground mt-2">Shows sample size and trust: health may be untrusted if probe coverage is low.</p>
                 </TooltipContent>
               </TooltipUI>
             </TooltipProvider>
           </h4>
           <div className="h-[200px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadialBarChart
-                cx="50%"
-                cy="50%"
-                innerRadius="60%"
-                outerRadius="100%"
-                startAngle={180}
-                endAngle={0}
-                data={healthData}
-              >
-                <defs>
-                  <linearGradient id="healthGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="hsl(168 80% 45%)" />
-                    <stop offset="100%" stopColor="hsl(270 70% 60%)" />
-                  </linearGradient>
-                </defs>
-                <RadialBar
-                  dataKey="value"
-                  cornerRadius={10}
-                  background={{ fill: "hsl(220 20% 15%)" }}
-                />
-              </RadialBarChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-bold gradient-text">{healthScore}</span>
-              <span className="text-sm text-muted-foreground">out of 100</span>
-            </div>
+              <ResponsiveContainer width="100%" height="100%">
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="60%"
+                  outerRadius="100%"
+                  startAngle={180}
+                  endAngle={0}
+                  data={healthData}
+                >
+                  <defs>
+                    <linearGradient id="healthGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="hsl(168 80% 45%)" />
+                      <stop offset="100%" stopColor="hsl(270 70% 60%)" />
+                    </linearGradient>
+                  </defs>
+                  <RadialBar
+                    dataKey="value"
+                    cornerRadius={10}
+                    background={{ fill: "hsl(220 20% 15%)" }}
+                  />
+                </RadialBarChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-4xl font-bold gradient-text">{healthScore}</span>
+                <span className="text-sm text-muted-foreground">out of 100</span>
+                <div className="mt-2 flex items-center gap-2">
+                  {health.trusted ? (
+                    <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 text-xs px-2 py-1 rounded-full">
+                      <CheckCircle className="h-3 w-3" />
+                      <span>Trusted</span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-400 text-xs px-2 py-1 rounded-full">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>Untrusted (low probe coverage)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
             <div className="p-2 rounded-lg bg-secondary/30">
@@ -375,69 +470,109 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
             </TooltipProvider>
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <div className="h-[200px]">
+            <div className="h-[260px] relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={regionalData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
+                    innerRadius={60}
+                    outerRadius={110}
                     paddingAngle={3}
                     dataKey="value"
+                    onMouseEnter={(_, index) => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
                   >
                     {regionalData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.fill}
+                        fillOpacity={hoveredIndex === null ? 1 : hoveredIndex === index ? 1 : 0.35}
+                        stroke={hoveredIndex === index ? 'hsl(210 20% 80%)' : 'transparent'}
+                        strokeWidth={hoveredIndex === index ? 2 : 0}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} content={<PieTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
+              {/* center total */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{regionalTotal}</div>
+                  <div className="text-xs text-muted-foreground">Total nodes</div>
+                </div>
+              </div>
             </div>
             <div className="space-y-3">
-              {regionalData.map((region) => (
-                <div key={region.name} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
+              {regionalData.map((region, idx) => (
+                <div
+                  key={region.name}
+                  className={`flex items-center justify-between p-3 rounded-lg ${hoveredIndex === idx ? 'border border-primary/30' : 'bg-secondary/30'}`}
+                  onMouseEnter={() => { setHoveredIndex(idx); setHoveredName(region.name); }}
+                  onMouseLeave={() => { setHoveredIndex(null); setHoveredName(null); }}
+                >
                   <div className="flex items-center gap-3">
                     <span className="h-3 w-3 rounded-full" style={{ background: region.fill }} />
-                    <span className="text-sm">{region.name}</span>
+                    <span className="text-sm truncate max-w-[220px]">{region.name}</span>
                   </div>
                   <div className="text-right">
                     <span className="font-semibold">{region.value}</span>
-                    <span className="text-muted-foreground text-sm ml-1">
-                      ({((region.value / nodes.length) * 100).toFixed(0)}%)
-                    </span>
+                    <span className="text-muted-foreground text-sm ml-1">({((region.value / Math.max(1, regionalTotal)) * 100).toFixed(0)}%)</span>
                   </div>
                 </div>
               ))}
+              {/* If there is an aggregated Other, provide an expand/tooltip */}
+              {regionalOtherList && regionalOtherList.length > 0 && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/20">
+                    <div className="flex items-center gap-3">
+                      <span className="h-3 w-3 rounded-full" style={{ background: 'hsl(220 20% 30%)' }} />
+                      <button className="text-sm text-primary underline" onClick={() => setShowOtherDetails(s => !s)}>
+                        Other ({regionalOtherList.length})
+                      </button>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-semibold">{regionalOtherList.reduce((s, r) => s + r.value, 0)}</span>
+                      <span className="text-muted-foreground text-sm ml-1">({((regionalOtherList.reduce((s, r) => s + r.value, 0) / Math.max(1, regionalTotal)) * 100).toFixed(0)}%)</span>
+                    </div>
+                  </div>
+
+                  {showOtherDetails && (
+                    <div className="mt-2 p-3 rounded bg-popover border border-border text-sm max-h-48 overflow-auto">
+                      {regionalOtherList.map(r => (
+                        <div key={r.name} className="flex items-center justify-between py-1">
+                          <div className="truncate max-w-[280px]">{r.name}</div>
+                          <div className="text-muted-foreground">{r.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3D Globe Visualization */}
-      <NetworkGlobe nodes={nodes} onLocationClick={handleGlobeLocationClick} />
-      
-      {/* Region Filter Indicator */}
-      {regionFilter && (
-        <div className="glass-card rounded-xl p-4 flex items-center justify-between animate-fade-in">
-          <div className="flex items-center gap-3">
-            <Filter className="h-4 w-4 text-primary" />
-            <span className="text-sm">
-              Showing nodes from: <span className="font-semibold text-primary">{regionFilter}</span>
-            </span>
-            <span className="text-xs text-muted-foreground">
-              ({filteredNodes.length} of {nodes.length} nodes)
-            </span>
-          </div>
-          <button
-            onClick={() => setRegionFilter(null)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Clear filter ×
-          </button>
-        </div>
-      )}
+      {/* Interactive 3D Globe (lazy-loaded) */}
+      <div>
+        <Suspense fallback={<div className="h-[420px] flex items-center justify-center">Loading globe...</div>}>
+          {
+            (() => {
+              const clusters = regionalData.map(r => {
+                const key = r.name;
+                const countryKey = key.split(',').slice(-1)[0].trim();
+                const centroid = countryCentroids[key] || countryCentroids[countryKey];
+                const matchedNodes = nodes.filter(n => (n.region || '').toLowerCase().includes((key || '').split(',').slice(-1)[0].trim().toLowerCase()));
+                return centroid ? { name: key, lat: centroid.lat, lon: centroid.lon, count: r.value, nodes: matchedNodes, color: r.fill } : null;
+              }).filter(Boolean as any);
+              return <GlobeLazy nodes={nodes} regionClusters={clusters} />;
+            })()
+          }
+        </Suspense>
+      </div>
 
       {/* Performance Over Time */}
       <div className="glass-card rounded-xl p-6">
@@ -507,11 +642,18 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
                 <XAxis type="number" stroke="hsl(215 15% 55%)" fontSize={12} />
                 <YAxis dataKey="name" type="category" stroke="hsl(215 15% 55%)" fontSize={12} width={60} />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {capacityData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
+                  <Bar dataKey="count" radius={[0, 8, 8, 0]}>
+                    {capacityData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.fill}
+                        fillOpacity={hoveredCapacityIndex === null ? 1 : hoveredCapacityIndex === index ? 1 : 0.35}
+                        onMouseEnter={() => setHoveredCapacityIndex(index)}
+                        onMouseLeave={() => setHoveredCapacityIndex(null)}
+                      />
+                    ))}
+                  </Bar>
+                  <Tooltip contentStyle={tooltipStyle} content={<CapacityTooltip />} />
               </BarChart>
             </ResponsiveContainer>
           </div>

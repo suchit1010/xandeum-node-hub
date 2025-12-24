@@ -118,7 +118,13 @@ const ChartTooltipContent = React.forwardRef<
     },
     ref,
   ) => {
-    const { config } = useChart();
+      const chartCtx = React.useContext(ChartContext);
+
+      if (!chartCtx) {
+        return null;
+      }
+
+      const { config } = chartCtx;
 
     const tooltipLabel = React.useMemo(() => {
       if (hideLabel || !payload?.length) {
@@ -235,7 +241,13 @@ const ChartLegendContent = React.forwardRef<
       nameKey?: string;
     }
 >(({ className, hideIcon = false, payload, verticalAlign = "bottom", nameKey }, ref) => {
-  const { config } = useChart();
+    const chartCtx = React.useContext(ChartContext);
+
+    if (!chartCtx || !payload?.length) {
+      return null;
+    }
+
+    const { config } = chartCtx;
 
   if (!payload?.length) {
     return null;

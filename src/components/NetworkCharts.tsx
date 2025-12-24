@@ -1,5 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 import { TrendingUp, PieChart as PieChartIcon } from "lucide-react";
+import { ChartTooltipContent } from "@/components/ui/chart";
+import { useState } from "react";
 
 interface ChartsProps {
   statusData: { name: string; value: number; color: string }[];
@@ -7,6 +9,7 @@ interface ChartsProps {
 }
 
 export function NetworkCharts({ statusData, trendData }: ChartsProps) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       {/* Status Distribution */}
@@ -26,28 +29,20 @@ export function NetworkCharts({ statusData, trendData }: ChartsProps) {
                 outerRadius={80}
                 paddingAngle={5}
                 dataKey="value"
+                onMouseEnter={(_, index) => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(null)}
               >
                 {statusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.color}
+                    stroke={activeIndex === index ? 'rgba(255,255,255,0.08)' : 'transparent'}
+                    strokeWidth={activeIndex === index ? 4 : 0}
+                    style={{ transition: 'stroke-width 120ms, transform 120ms' }}
+                  />
                 ))}
               </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  background: "hsl(220 20% 12%)", 
-                  border: "1px solid hsl(168 80% 45%)",
-                  borderRadius: "8px",
-                  color: "#ffffff",
-                  padding: "8px 12px",
-                }}
-                itemStyle={{
-                  color: "#ffffff",
-                }}
-                labelStyle={{
-                  color: "hsl(168 80% 45%)",
-                  fontWeight: "bold",
-                  marginBottom: "4px",
-                }}
-              />
+              <Tooltip content={<ChartTooltipContent indicator="dot" />} />
             </PieChart>
           </ResponsiveContainer>
         </div>
