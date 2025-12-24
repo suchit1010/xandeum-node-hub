@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -11,6 +11,7 @@ import {
   Calendar, Download, Filter, Map, FileJson, FileSpreadsheet,
   Info, AlertCircle, CheckCircle
 } from "lucide-react";
+import { NetworkGlobe } from "@/components/NetworkGlobe";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip as TooltipUI,
@@ -33,7 +34,17 @@ interface AnalyticsTabProps {
 
 export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
   const [selectedTimeRange, setSelectedTimeRange] = useState("7d");
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
 
+  const handleGlobeLocationClick = useCallback((region: string) => {
+    setRegionFilter(prev => prev === region ? null : region);
+  }, []);
+
+  // Filter nodes by region if filter is set
+  const filteredNodes = useMemo(() => {
+    if (!regionFilter) return nodes;
+    return nodes.filter(n => n.region === regionFilter);
+  }, [nodes, regionFilter]);
   // Regional Distribution Data
   const regionalData = useMemo(() => {
     const regions = nodes.reduce((acc, node) => {
@@ -404,21 +415,29 @@ export function AnalyticsTab({ nodes }: AnalyticsTabProps) {
         </div>
       </div>
 
-      {/* Geo Map Placeholder */}
-      <div className="glass-card rounded-xl p-6">
-        <h4 className="font-semibold mb-4 flex items-center gap-2">
-          <Map className="h-4 w-4 text-primary" />
-          Network Geography
-          <span className="text-xs bg-xandeum-purple/20 text-xandeum-purple px-2 py-0.5 rounded-full ml-2">Coming Soon</span>
-        </h4>
-        <div className="h-[200px] flex items-center justify-center rounded-lg bg-secondary/20 border border-dashed border-border/50">
-          <div className="text-center">
-            <Map className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground">Interactive world map showing pNode locations</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Decentralization insights from IP geolocation</p>
+      {/* 3D Globe Visualization */}
+      <NetworkGlobe nodes={nodes} onLocationClick={handleGlobeLocationClick} />
+      
+      {/* Region Filter Indicator */}
+      {regionFilter && (
+        <div className="glass-card rounded-xl p-4 flex items-center justify-between animate-fade-in">
+          <div className="flex items-center gap-3">
+            <Filter className="h-4 w-4 text-primary" />
+            <span className="text-sm">
+              Showing nodes from: <span className="font-semibold text-primary">{regionFilter}</span>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ({filteredNodes.length} of {nodes.length} nodes)
+            </span>
           </div>
+          <button
+            onClick={() => setRegionFilter(null)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear filter ×
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Performance Over Time */}
       <div className="glass-card rounded-xl p-6">
