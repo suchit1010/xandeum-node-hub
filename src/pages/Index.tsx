@@ -32,7 +32,8 @@ const Index = () => {
   const [coverageAttempted, setCoverageAttempted] = useState<number | null>(null);
   const [coverageResponded, setCoverageResponded] = useState<number | null>(null);
   const [lastFetchDurationMs, setLastFetchDurationMs] = useState<number | null>(null);
-  const [prpcProgress, setPrpcProgress] = useState<any>(null);
+  type PrpcProgressType = Record<string, unknown> | null;
+  const [prpcProgress, setPrpcProgress] = useState<PrpcProgressType>(null);
   const [selectedNode, setSelectedNode] = useState<PNode | null>(null);
   const [refreshInterval, setRefreshInterval] = useState<number>(60000); // ms, 0 = off
 
@@ -121,12 +122,12 @@ const Index = () => {
     }
     window.addEventListener('xandeum:globe-select', onGlobeSelect as EventListener);
 
-    function onPrpcProgress(e: CustomEvent<any>) {
+    function onPrpcProgress(e: CustomEvent<Record<string, unknown>>) {
       const d = e?.detail;
       if (!d) return;
       setPrpcProgress(d);
-      // clear after few seconds
-      setTimeout(() => setPrpcProgress(null), 4000);
+      // clear after a slightly longer timeout (5s)
+      setTimeout(() => setPrpcProgress(null), 5000);
     }
     window.addEventListener('xandeum:prpc-progress', onPrpcProgress as EventListener);
 
@@ -154,10 +155,11 @@ const Index = () => {
     const q = (searchQuery || "").trim().toLowerCase();
     return nodes.filter((node) => {
       const matchesStatus = statusFilter === "all" || node.status === statusFilter;
-      const matchesRegion = regionFilter === "all" || 
-        (regionFilter === "na" && node.region === "North America") ||
-        (regionFilter === "eu" && node.region === "Europe") ||
-        (regionFilter === "asia" && node.region === "Asia Pacific");
+      const matchesRegion = regionFilter === "all" ||
+        (regionFilter === 'na' && node.region === 'North America') ||
+        (regionFilter === 'eu' && node.region === 'Europe') ||
+        (regionFilter === 'asia' && node.region === 'Asia Pacific') ||
+        (regionFilter !== 'na' && regionFilter !== 'eu' && regionFilter !== 'asia' && regionFilter !== 'all' && node.region === regionFilter);
       const matchesVersion = !versionFilter || versionFilter === "all" || node.version === versionFilter;
       if (!q) return matchesStatus && matchesRegion && matchesVersion;
 
@@ -170,6 +172,16 @@ const Index = () => {
       return matchesStatus && matchesRegion && matchesVersion && matchesSearch;
     });
   }, [nodes, statusFilter, regionFilter, searchQuery, versionFilter]);
+
+  // derive unique region names for the top filter (sorted)
+  const uniqueRegions = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of nodes) {
+      const r = (n.region || '').trim();
+      if (r) set.add(r);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [nodes]);
 
   const versions = useMemo(() => {
     const s = Array.from(new Set(nodes.map(n => n.version).filter(Boolean)));
@@ -315,6 +327,7 @@ const Index = () => {
               setStatusFilter={setStatusFilter}
               regionFilter={regionFilter}
               setRegionFilter={setRegionFilter}
+              regions={uniqueRegions}
               versionFilter={versionFilter}
               setVersionFilter={setVersionFilter}
               versions={versions}

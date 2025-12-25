@@ -1,6 +1,11 @@
 import React from 'react';
 
-export default function PrpcProgress({ progress }: { progress: any | null }) {
+type PrpcProgressData = {
+  attempted?: number;
+  responded?: number;
+} | null;
+
+export default function PrpcProgress({ progress }: { progress: PrpcProgressData }) {
   if (!progress) return null;
   const attempted = progress.attempted ?? 0;
   const responded = progress.responded ?? 0;

@@ -15,6 +15,7 @@ interface FilterBarProps {
   setStatusFilter: (value: string) => void;
   regionFilter: string;
   setRegionFilter: (value: string) => void;
+  regions?: string[];
   versionFilter?: string;
   setVersionFilter?: (v: string) => void;
   versions?: string[];
@@ -30,6 +31,7 @@ export function FilterBar({
   setStatusFilter,
   regionFilter,
   setRegionFilter,
+  regions = [],
   versionFilter,
   setVersionFilter,
   versions,
@@ -66,14 +68,20 @@ export function FilterBar({
         </Select>
 
         <Select value={regionFilter} onValueChange={setRegionFilter}>
-          <SelectTrigger className="w-[140px] bg-secondary/50 border-border/50">
+          <SelectTrigger className="w-[200px] bg-secondary/50 border-border/50">
             <SelectValue placeholder="Region" />
           </SelectTrigger>
-          <SelectContent className="bg-popover border-border">
+          <SelectContent className="bg-popover border-border max-h-60 overflow-auto">
             <SelectItem value="all">All Regions</SelectItem>
             <SelectItem value="na">North America</SelectItem>
             <SelectItem value="eu">Europe</SelectItem>
             <SelectItem value="asia">Asia Pacific</SelectItem>
+            {regions.length > 0 && (
+              <div className="px-2 pt-2 text-xs text-muted-foreground">Specific Regions</div>
+            )}
+            {regions.map(r => (
+              <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

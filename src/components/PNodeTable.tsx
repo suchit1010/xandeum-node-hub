@@ -96,7 +96,7 @@ interface PNodeTableProps {
   onViewDetails?: (node: PNode) => void;
 }
 
-type SortField = "uptime" | "capacity" | "peers" | "stake" | "lastSeen";
+type SortField = "uptime" | "capacity" | "stake" | "lastSeen" | "region";
 type SortDirection = "asc" | "desc";
 
 const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
@@ -148,13 +148,23 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
     return Math.max(1, ...nodes.map(n => Number(n.capacity) || 0));
   }, [nodes]);
 
+  // Count nodes per region (for tooltip + filter options)
+  const nodesPerRegion = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const n of filteredNodes) {
+      const r = (n.region || "").trim() || "Unknown";
+      map.set(r, (map.get(r) || 0) + 1);
+    }
+    return map;
+  }, [filteredNodes]);
+
   const sortedNodes = useMemo(() => {
     const getFieldValue = (node: PNode, field: SortField) => {
       if (field === 'lastSeen') return new Date(node.lastSeen).getTime();
       if (field === 'uptime') return Number(node.uptime ?? 0);
       if (field === 'capacity') return Number(node.capacity ?? 0);
-      if (field === 'peers') return Number(node.peers ?? 0);
       if (field === 'stake') return Number(node.stake ?? 0);
+      if (field === 'region') return String(node.region ?? 'Unknown').toLowerCase();
       return 0;
     };
 
@@ -162,7 +172,16 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
       const multiplier = sortDirection === "asc" ? 1 : -1;
       const av = getFieldValue(a, sortField);
       const bv = getFieldValue(b, sortField);
-      return (av - bv) * multiplier;
+
+      // If both values are strings, compare lexically
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return av.localeCompare(bv) * multiplier;
+      }
+
+      // Otherwise, compare numerically
+      const na = Number(av ?? 0);
+      const nb = Number(bv ?? 0);
+      return (na - nb) * multiplier;
     });
   }, [filteredNodes, sortField, sortDirection]);
 
@@ -196,8 +215,8 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
   useEffect(() => {
     const handler = () => {
       try {
-        const headers = ["ID", "Address", "Status", "Uptime", "Capacity", "Peers", "Stake", "Version", "Region"];
-        const rows = sortedNodes.map(n => [n.id, n.address, n.status, n.uptime, n.capacity, n.peers, n.stake, n.version, n.region]);
+        const headers = ["ID", "Address", "Status", "Uptime", "Capacity", "Stake", "Version", "Region"];
+        const rows = sortedNodes.map(n => [n.id, n.address, n.status, n.uptime, n.capacity, n.stake, n.version, n.region]);
         const csvContent = [headers, ...rows]
           .map(r => r.map(c => String(c ?? '').replace(/"/g, '""')).map(c => `"${c}"`).join(','))
           .join('\n');
@@ -218,7 +237,7 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
 
     const jsonHandler = () => {
       try {
-        const payload = sortedNodes.map(n => ({ id: n.id, address: n.address, status: n.status, uptime: n.uptime, capacity: n.capacity, peers: n.peers, stake: n.stake, version: n.version, region: n.region }));
+        const payload = sortedNodes.map(n => ({ id: n.id, address: n.address, status: n.status, uptime: n.uptime, capacity: n.capacity, stake: n.stake, version: n.version, region: n.region }));
         const jsonContent = JSON.stringify(payload, null, 2);
         const blob = new Blob([jsonContent], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -311,6 +330,7 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
             </SelectContent>
           </Select>
         </div>
+        {/* Region select removed from table header to avoid duplication — use top FilterBar instead */}
       </div>
 
       <div className="overflow-x-auto">
@@ -345,8 +365,8 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                 </Button>
               </TableHead>
               <TableHead className="hidden md:table-cell">
-                <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("peers")}>
-                  Peers <SortIcon field="peers" />
+                <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("region")}>
+                  Region <SortIcon field="region" />
                 </Button>
               </TableHead>
               <TableHead className="hidden md:table-cell">Credits</TableHead>
@@ -366,7 +386,10 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
           </TableHeader>
           <TableBody>
             {paginatedNodes.map((node, index) => (
-              <TableRow key={node.id} className="data-table-row border-border/30">
+              <TableRow
+                key={node.id}
+                className={`data-table-row border-border/30 ${globeFilter && String(node.region ?? '').toLowerCase().includes(String(globeFilter ?? '').toLowerCase()) ? 'bg-secondary/10 ring-1 ring-xandeum-orange/10' : ''}`}
+              >
                 <TableCell className="font-mono text-muted-foreground">
                   {node.isTop && <Star className="h-3 w-3 text-xandeum-orange inline mr-1" />}
                   {startIndex + index + 1}
@@ -416,8 +439,21 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                     </div>
                   </div>
                 </TableCell>
+                {/* Region cell */}
                 <TableCell className="hidden md:table-cell">
-                  <span className="font-mono">{node.peers === null || node.peers === undefined ? 'N/A' : node.peers}</span>
+                  {(() => {
+                    const regionName = node.region?.trim() || 'Unknown';
+                    const count = nodesPerRegion.get(regionName) ?? 0;
+                    const title = `${count} node${count === 1 ? '' : 's'} in this region`;
+                    const showUnknown = regionName === 'Unknown';
+                    const emoji = '🌐';
+                    return (
+                      <div title={title} className={`flex items-center gap-2 ${showUnknown ? 'text-muted-foreground' : ''}`}>
+                        <span className="text-sm">{emoji}</span>
+                        <span className={`text-sm ${showUnknown ? 'text-muted-foreground' : ''}`}>{regionName}</span>
+                      </div>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   <span className="font-mono">{formatStake(node.stake ?? 0)}</span>

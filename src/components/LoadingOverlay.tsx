@@ -18,30 +18,44 @@ export function LoadingOverlay({ isVisible }: LoadingOverlayProps) {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
+    let finalizeInterval: NodeJS.Timeout | null = null;
     if (!isVisible) {
-      setFadeOut(true);
-      return;
+      // When hiding, advance progress to 100% and then fade out
+      finalizeInterval = setInterval(() => {
+        setProgress((prev) => {
+          const next = Math.min(100, prev + Math.random() * 6 + 4);
+          if (next >= 100) {
+            // schedule fadeOut shortly after reaching 100
+            setTimeout(() => setFadeOut(true), 600);
+          }
+          return next;
+        });
+      }, 200);
+    } else {
+      setFadeOut(false);
+      setMessageIndex(0);
+      setProgress(0);
     }
-    setFadeOut(false);
-    setMessageIndex(0);
-    setProgress(0);
+    return () => {
+      if (finalizeInterval) clearInterval(finalizeInterval);
+    };
   }, [isVisible]);
 
-  // Cycle through status messages
+  // Cycle through status messages (slower for longer visibility)
   useEffect(() => {
     if (!isVisible) return;
     const interval = setInterval(() => {
       setMessageIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
-    }, 2500);
+    }, 4000);
     return () => clearInterval(interval);
   }, [isVisible]);
 
-  // Simulate progress
+  // Simulate progress (slower, more gradual)
   useEffect(() => {
     if (!isVisible) return;
     const interval = setInterval(() => {
-      setProgress((prev) => Math.min(prev + Math.random() * 8 + 2, 95));
-    }, 300);
+      setProgress((prev) => Math.min(prev + Math.random() * 4 + 1, 95));
+    }, 500);
     return () => clearInterval(interval);
   }, [isVisible]);
 
