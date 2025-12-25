@@ -6,7 +6,7 @@
 # Xandeum Node Hub
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Build](https://img.shields.io/badge/build-pending-lightgrey)](#)
+[![xandeum](https://www.xandeum.network/docs?_gl=1*evqx9y*_gcl_au*MTI4NDY0NTA3OC4xNzY1MzQ4NzEy)](docs)
 
 Short overview of Xandeum
 -------------------------
