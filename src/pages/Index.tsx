@@ -7,6 +7,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { PNodeTable, PNode } from "@/components/PNodeTable";
 import { PNodeGrid } from "@/components/PNodeGrid";
 import { AnalyticsTab } from "@/components/AnalyticsTab";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, BarChart3, Trophy } from "lucide-react";
@@ -259,9 +260,12 @@ const Index = () => {
     [...nodes].sort((a, b) => b.stake - a.stake).slice(0, 10)
   , [nodes]);
 
+  // Show loading overlay only on initial load (no cached data yet)
+  const showLoadingOverlay = isLoading && nodes.length === 0;
+
   return (
     <div className="min-h-screen">
-      {/* Debug overlay removed for cleaner UI */}
+      <LoadingOverlay isVisible={showLoadingOverlay} />
       <Header
         onRefresh={handleRefresh}
         isLoading={isLoading}
