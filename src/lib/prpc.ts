@@ -2,6 +2,8 @@
 import axios from 'axios';
 import _ from 'lodash';
 
+
+
 export interface PNode {
   address: string; // e.g., "IP:9001"
   is_public: boolean;
@@ -45,6 +47,20 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
       return msg.includes('aborted') || msg.includes('timeout') || code === 'ECONNABORTED' || name === 'CanceledError';
     };
   
+    // Prefer build-time env, then an injected runtime global, otherwise fall back to local serverless path.
+    // If the bundle was built without the env var, force a runtime fallback to the Render proxy so the
+    // deployed frontend can reach a working backend immediately.
+    const RENDER_PROXY = 'https://prpc-proxy.onrender.com/api/prpc-proxy';
+    const API_URL = (import.meta as any).env?.VITE_PRPC_PROXY_URL ?? (typeof window !== 'undefined' ? (window as any).__PRPC_PROXY_URL : undefined) ?? '/api/prpc-proxy';
+    const RUNTIME_API_URL: string = (typeof window !== 'undefined' && API_URL === '/api/prpc-proxy') ? RENDER_PROXY : API_URL;
+    if (typeof window !== 'undefined') {
+      (window as any).__PRPC_PROXY_USED = RUNTIME_API_URL;
+      // Helpful runtime log to verify which proxy the built app is using in the browser console
+      // (remove this after verification).
+      // eslint-disable-next-line no-console
+      console.log('PRPC proxy (runtime):', RUNTIME_API_URL);
+    }
+
     const doProxyRequest = async (
       url: string,
       payload: {
@@ -60,7 +76,7 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
       const retries = Math.max(1, opts?.retries ?? 1);
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-          const res = await axios.post('/api/prpc-proxy', { url, payload }, { timeout });
+          const res = await axios.post(RUNTIME_API_URL, { url, payload }, { timeout });
           return res;
         } catch (err: unknown) {
           if (isAbortLike(err)) {
