@@ -8,6 +8,8 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![xandeum](https://www.xandeum.network/docs?_gl=1*evqx9y*_gcl_au*MTI4NDY0NTA3OC4xNzY1MzQ4NzEy)](docs)
 
+**Tags:** `xandeum` • `solana` • `blockchain` • `node` • `monitoring`
+
 Short overview of Xandeum
 -------------------------
 Xandeum is a decentralized blockchain platform designed to be scalable, modular and developer-friendly. It provides the fundamentals for building and running distributed applications and services with an emphasis on performance, reliability and operator ergonomics. This repository — Xandeum Node Hub — contains tools, scripts, and documentation to bootstrap, run, monitor and operate Xandeum network nodes in development and production environments.

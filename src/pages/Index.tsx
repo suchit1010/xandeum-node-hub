@@ -16,6 +16,8 @@ import { fetchPNodes, fetchPodCredits, mapToAppPNode } from "@/lib/prpc";
 import NodeDetailsModal from '@/components/NodeDetailsModal';
 import { VirtualizedGrid } from "@/components/VirtualizedGrid";
 
+const API_URL = "/api/prpc-proxy";
+
 const Index = () => {
   const [nodes, setNodes] = useState<PNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
