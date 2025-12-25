@@ -37,6 +37,7 @@ export function FilterBar({
   setSearchQuery,
   viewMode,
   setViewMode,
+  onExport,
 }: FilterBarProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-4 mb-6">
