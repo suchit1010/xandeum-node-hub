@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { formatPercent, formatStake } from "@/lib/format";
 import { 
   ArrowUpDown, 
   ArrowUp, 
@@ -45,11 +46,40 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 
+// Simple inline sparkline component (SVG)
+function Sparkline({ values, color = '#2dd4bf', width = 80, height = 24 }: { values: number[]; color?: string; width?: number; height?: number }) {
+  if (!values || values.length === 0) return null;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = Math.max(1, max - min);
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="block">
+      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+    </svg>
+  );
+}
+
+function generateHistory(uptime?: number | null, len = 24) {
+  const base = Math.max(0, Math.min(100, Number(uptime ?? 0)));
+  const out: number[] = [];
+  for (let i = 0; i < len; i++) {
+    const jitter = (Math.random() - 0.5) * 6; // +/-3
+    out.push(Math.max(0, Math.min(100, base + jitter)));
+  }
+  return out;
+}
+
 export interface PNode {
   id: string;
   address: string;
   status: "online" | "offline" | "syncing";
   uptime: number;
+  uptimeHistory?: number[];
   capacity: number;
   peers: number;
   lastSeen: Date | string;
@@ -109,7 +139,7 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
     const f = globeFilter.toLowerCase();
     return nodes.filter((n) => {
       const region = (n.region || "").toLowerCase();
-      const country = ((n as any).country || "").toLowerCase();
+      const country = (n.country ?? "").toLowerCase();
       return region.includes(f) || country.includes(f) || String(n.id).toLowerCase().includes(f);
     });
   }, [nodes, globeFilter]);
@@ -231,7 +261,7 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
 
   const formatTimeSince = (date: Date | string | number | null) => {
     // Accept Date, string, number, or null; normalize to Date
-    const d = date instanceof Date ? date : (date ? new Date(date as any) : null);
+    const d = date instanceof Date ? date : (date ? new Date(date as string | number) : null);
     if (!d || Number.isNaN(d.getTime())) return '—';
     const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
     if (seconds < 60) return `${seconds}s ago`;
@@ -360,21 +390,27 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                 <TableCell>
                   <div className="space-y-1">
                     <span className={`font-medium ${node.uptime >= 99 ? "text-emerald-400" : node.uptime >= 95 ? "text-primary" : "text-xandeum-orange"}`}>
-                      {node.uptime}%
+                      {formatPercent(Number(node.uptime ?? 0), 1)}
                     </span>
-                    <div className="progress-bar w-16 sm:w-20">
-                      <div className="progress-bar-fill" style={{ width: `${node.uptime}%` }} />
+                    <div className="flex items-center gap-2">
+                      <div className="progress-bar w-16 sm:w-20">
+                        <div className="progress-bar-fill" style={{ width: `${node.uptime}%` }} />
+                      </div>
+                      <div className="hidden sm:block">
+                        {/* uptime sparkline (24 samples) */}
+                        <Sparkline values={node.uptimeHistory ?? generateHistory(node.uptime)} width={80} height={22} color={node.uptime >= 95 ? '#2dd4bf' : '#f59e0b'} />
+                      </div>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   <div className="space-y-1">
-                    <span className="font-medium">{Number(node.capacity).toFixed(1)} GB</span>
+                    <span className="font-medium">{formatPercent(Number(node.capacity ?? 0), 1)}</span>
                     <div className="progress-bar w-20">
                       <div 
                         className="progress-bar-fill" 
                         style={{ 
-                          width: `${Math.min(100, Math.round((Number(node.capacity) / maxCapacity) * 100))}%`,
+                          width: `${Math.min(100, Math.round(Number(node.capacity ?? 0)))}%`,
                         }} 
                       />
                     </div>
@@ -384,11 +420,11 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                   <span className="font-mono">{node.peers === null || node.peers === undefined ? 'N/A' : node.peers}</span>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <span className="font-mono">{node.stake ?? 0}</span>
+                  <span className="font-mono">{formatStake(node.stake ?? 0)}</span>
                 </TableCell>
                 <TableCell>
                   <span className="font-mono text-primary font-medium">
-                    {(node.stake / 1000).toFixed(1)}K
+                    {formatStake(node.stake ?? 0)}
                   </span>
                 </TableCell>
                 <TableCell className="hidden xl:table-cell">

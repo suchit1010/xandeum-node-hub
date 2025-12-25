@@ -33,7 +33,7 @@ export default function NodeDetailsModal({ open, onOpenChange, node }: NodeProps
   };
 
   const copyPubkey = () => {
-    const text = node.id || node.pubkey || node.pub_key || '';
+    const text = node.id || node.pubkey || '';
     if (text) navigator.clipboard.writeText(text);
   };
 

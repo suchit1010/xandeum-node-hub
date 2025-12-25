@@ -34,41 +34,64 @@ const bootstrapEndpoints = [
 export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; source?: string; meta?: { attempted: number; responded: number; durationMs: number } }> {
   const methods = ['get-pods-with-stats', 'get-pods']; // Primary for stats, fallback for basic list
   // Helper: perform a proxy request with timeout + retries and quiet handling for aborts/timeouts
-  const isAbortLike = (err: any) => {
-    if (!err) return false;
-    const msg = String(err?.message || '').toLowerCase();
-    return msg.includes('aborted') || msg.includes('timeout') || err?.code === 'ECONNABORTED' || err?.name === 'CanceledError';
-  };
-
-  const doProxyRequest = async (url: string, payload: any, opts?: { timeout?: number; retries?: number }) => {
-    const timeout = opts?.timeout ?? 15000;
-    const retries = Math.max(1, opts?.retries ?? 2);
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const res = await axios.post('/api/prpc-proxy', { url, payload }, { timeout });
-        return res;
-      } catch (err: any) {
-        if (isAbortLike(err)) {
-          // expected when remote endpoint is slow / resets — keep quiet
-          return null;
+    const isAbortLike = (err: unknown): boolean => {
+      if (err == null) return false;
+      const obj = err as Record<string, unknown>;
+      const rawMessage = obj.message ?? '';
+      const message = typeof rawMessage === 'string' ? rawMessage : String(rawMessage);
+      const msg = message.toLowerCase();
+      const code = typeof obj.code === 'string' ? obj.code : '';
+      const name = typeof obj.name === 'string' ? obj.name : '';
+      return msg.includes('aborted') || msg.includes('timeout') || code === 'ECONNABORTED' || name === 'CanceledError';
+    };
+  
+    const doProxyRequest = async (
+      url: string,
+      payload: {
+        jsonrpc?: string;
+        id?: number | string;
+        method?: string;
+        params?: unknown[];
+        [key: string]: unknown;
+      },
+      opts?: { timeout?: number; retries?: number }
+    ) => {
+      const timeout = opts?.timeout ?? 8000;
+      const retries = Math.max(1, opts?.retries ?? 1);
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const res = await axios.post('/api/prpc-proxy', { url, payload }, { timeout });
+          return res;
+        } catch (err: unknown) {
+          if (isAbortLike(err)) {
+            // expected when remote endpoint is slow / resets — keep quiet
+            return null;
+          }
+          // log debug for other errors, but avoid spamming console.warn for intermittent failures
+          const msg = (() => {
+            if (err == null) return '';
+            if (typeof err === 'object') {
+              const e = err as { message?: unknown };
+              if (typeof e.message === 'string') return e.message;
+            }
+            return String(err);
+          })();
+          console.debug(`pRPC proxy attempt ${attempt} failed for ${url}:`, msg);
+          // small backoff before retrying
+          if (attempt < retries) await new Promise((r) => setTimeout(r, 200 * attempt));
         }
-        // log debug for other errors, but avoid spamming console.warn for intermittent failures
-        console.debug(`pRPC proxy attempt ${attempt} failed for ${url}:`, err?.message || err);
-        // small backoff before retrying
-        if (attempt < retries) await new Promise((r) => setTimeout(r, 200 * attempt));
       }
-    }
-    return null;
-  };
+      return null;
+    };
 
   // Quick probe to estimate coverage: ping all bootstrap endpoints with a lightweight get-pods call (short timeout)
   const probeStart = Date.now();
   const probePromises = bootstrapEndpoints.map(async (url) => {
     try {
-      const r = await doProxyRequest(url, { jsonrpc: '2.0', id: 1, method: 'get-pods', params: [] }, { timeout: 4000, retries: 1 });
+      const r = await doProxyRequest(url, { jsonrpc: '2.0', id: 1, method: 'get-pods', params: [] }, { timeout: 3000, retries: 1 });
       if (r && r.data) return { ok: true, url, data: r.data };
       return { ok: false, url };
-    } catch (e) {
+    } catch (e: unknown) {
       return { ok: false, url };
     }
   });
@@ -76,53 +99,154 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
   const probeResultsSettled = await Promise.allSettled(probePromises);
   const probeResults = probeResultsSettled.map((s) => (s.status === 'fulfilled' ? s.value : { ok: false, url: 'unknown' }));
   const responded = probeResults.filter((r) => r.ok).length;
-
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('xandeum:prpc-progress', { detail: { attempted: bootstrapEndpoints.length, responded } }));
+    }
+  } catch (e) {
+    // ignore
+  }
+  // Try to fetch in small parallel batches for fast cold-starts
   for (const method of methods) {
-    let fullFetchResponded = 0;
-    for (const url of _.shuffle(bootstrapEndpoints)) { // Shuffle for load balance
-      try {
-        // Use proxy route to bypass browser port block
-        const start = Date.now();
-        const response = await doProxyRequest(url, { jsonrpc: '2.0', id: 1, method, params: [] }, { timeout: 20000, retries: 2 });
-        const durationMs = Date.now() - start;
-
-        if (!response) {
-          // no usable response (likely timeout/abort); try next
-          continue;
-        }
-
-        // Handle differing response shapes: either result = [nodes] or result = { pods: [nodes], total_count }
+    // First attempt: Promise.any across endpoints so we resolve as soon as any endpoint returns usable nodes
+    try {
+      const endpoints = _.shuffle(bootstrapEndpoints);
+      const attemptPromises = endpoints.map(async (url) => {
+        const response = await doProxyRequest(url, { jsonrpc: '2.0', id: 1, method, params: [] }, { timeout: 8000, retries: 1 });
+        if (!response) throw new Error('no response');
         const result = response.data?.result;
         let nodesArray: unknown[] | undefined;
-        if (Array.isArray(result)) {
-          nodesArray = result as unknown[];
-        } else if (result && Array.isArray((result as any).pods)) {
-          nodesArray = (result as any).pods as unknown[];
+        if (Array.isArray(result)) nodesArray = result as unknown[];
+        else if (result) {
+          const pods = (result as unknown as { pods?: unknown }).pods;
+          if (Array.isArray(pods)) nodesArray = pods as unknown[];
         } else if (response.data && Array.isArray(response.data)) {
-          // sometimes response may be direct array
           nodesArray = response.data as unknown[];
         }
-
-        // Narrow unknowns into PNode objects using a small runtime check
-        const isPNode = (obj: any): obj is PNode => {
-          return obj && typeof obj === 'object' && typeof obj.pubkey === 'string' && typeof obj.address === 'string' && typeof obj.uptime === 'number';
+        if (!nodesArray || !Array.isArray(nodesArray) || nodesArray.length === 0) throw new Error('no nodes');
+        const isPNode = (obj: unknown): obj is PNode => {
+          if (obj == null || typeof obj !== 'object') return false;
+          const o = obj as Record<string, unknown>;
+          return typeof o.pubkey === 'string' && typeof o.address === 'string' && typeof o.uptime === 'number';
         };
+        const mapped = nodesArray.filter(isPNode).map((node) => ({
+          ...node,
+          status: node && node.uptime && node.uptime > 0 ? 'online' : 'offline',
+        }));
+        const meta = { attempted: bootstrapEndpoints.length, responded: Math.max(responded, 1), durationMs: Date.now() - probeStart };
+        return { nodes: mapped as unknown as PNode[], raw: response.data, source: url, meta };
+      });
 
-        if (nodesArray && Array.isArray(nodesArray)) {
-          fullFetchResponded++;
-          const mapped = nodesArray.filter(isPNode).map((node) => ({
-            ...node,
-            status: node && node.uptime && node.uptime > 0 ? 'online' : 'offline',
-          }));
-          return { nodes: mapped as unknown as PNode[], raw: response.data, source: url, meta: { attempted: bootstrapEndpoints.length, responded: Math.max(responded, fullFetchResponded), durationMs: Date.now() - probeStart } };
+      // Race to first successful resolved promise
+      // Polyfill for Promise.any if not available
+      // Polyfill AggregateError if not available
+      class PolyfillAggregateError extends Error {
+        public errors: unknown[];
+        constructor(errors: unknown[], message?: string) {
+          super(message);
+          this.name = 'AggregateError';
+          this.errors = errors;
         }
-      } catch (error) {
-        // Be quiet about aborts/timeouts; debug log other errors
-        if (isAbortLike(error)) {
-          // expected network abort/timeout; not a fatal error
-        } else {
-          console.debug(`pRPC fetch failed on ${url} with ${method}:`, error?.message || error);
+      }
+      // Use globalThis.AggregateError if available, otherwise use the polyfill
+      interface AggregateErrorConstructorLike {
+        new (errors: unknown[], message?: string): Error;
+      }
+      const AggregateErrorImpl: AggregateErrorConstructorLike = (() => {
+        const g = globalThis as unknown as { AggregateError?: new (errors: unknown[], message?: string) => Error };
+        return typeof g.AggregateError !== 'undefined' ? g.AggregateError : PolyfillAggregateError;
+      })();
+
+      function promiseAny<T>(promises: Promise<T>[]): Promise<T> {
+        return new Promise((resolve, reject) => {
+          const rejections: unknown[] = [];
+          let pending = promises.length;
+          if (pending === 0) return reject(new AggregateErrorImpl([], 'All promises were rejected'));
+          promises.forEach((p, i) => {
+            p.then(resolve).catch(e => {
+              rejections[i] = e;
+              pending--;
+              if (pending === 0) {
+                reject(new AggregateErrorImpl(rejections, 'All promises were rejected'));
+              }
+            });
+          });
+        });
+      }
+      
+      type AnyFn = <T>(promises: Promise<T>[]) => Promise<T>;
+      const promiseAnyImpl: AnyFn = ((Promise as unknown as { any?: AnyFn }).any) ?? promiseAny;
+      const winner = await promiseAnyImpl<{ nodes: PNode[]; raw: unknown; source: string; meta: { attempted: number; responded: number; durationMs: number } }>(attemptPromises);
+      try {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          window.dispatchEvent(new CustomEvent('xandeum:prpc-progress', { detail: winner.meta }));
         }
+      } catch (e) {
+        // Ignore dispatch errors but log for diagnostics
+        console.debug('xandeum:prpc-progress dispatch failed', e);
+      }
+      return winner;
+    } catch (err) {
+      // Promise.any failed (all endpoints failed quickly) — fall back to batched probing below
+    }
+
+    // Fallback: try in small parallel batches to collect a response
+    let fullFetchResponded = 0;
+    const endpoints = _.shuffle(bootstrapEndpoints);
+    const batchSize = 6;
+    for (let i = 0; i < endpoints.length; i += batchSize) {
+      const batch = endpoints.slice(i, i + batchSize);
+      const startBatch = Date.now();
+      try {
+        const results = await Promise.all(batch.map((url) => doProxyRequest(url, { jsonrpc: '2.0', id: 1, method, params: [] }, { timeout: 8000, retries: 1 })));
+        for (let j = 0; j < results.length; j++) {
+          const response = results[j];
+          const url = batch[j];
+          if (!response) continue;
+
+          const result = response.data?.result;
+          let nodesArray: unknown[] | undefined;
+          if (Array.isArray(result)) nodesArray = result as unknown[];
+          else if (result) {
+            const pods = (result as unknown as { pods?: unknown }).pods;
+            if (Array.isArray(pods)) nodesArray = pods as unknown[];
+          } else if (response.data && Array.isArray(response.data)) {
+            nodesArray = response.data as unknown[];
+          }
+
+          const isPNode = (obj: unknown): obj is PNode => {
+            if (obj == null || typeof obj !== 'object') return false;
+            const o = obj as Record<string, unknown>;
+            return typeof o.pubkey === 'string' && typeof o.address === 'string' && typeof o.uptime === 'number';
+          };
+
+          if (nodesArray && Array.isArray(nodesArray)) {
+            fullFetchResponded++;
+            const mapped = nodesArray.filter(isPNode).map((node) => ({
+              ...node,
+              status: node && node.uptime && node.uptime > 0 ? 'online' : 'offline',
+            }));
+            const meta = { attempted: bootstrapEndpoints.length, responded: Math.max(responded, fullFetchResponded), durationMs: Date.now() - probeStart };
+            try {
+              if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('xandeum:prpc-progress', { detail: meta }));
+              }
+            } catch (e) {
+              // ignore
+            }
+            return { nodes: mapped as unknown as PNode[], raw: response.data, source: url, meta };
+          }
+        }
+        const batchDuration = Date.now() - startBatch;
+        try {
+          if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('xandeum:prpc-progress', { detail: { attempted: bootstrapEndpoints.length, responded: Math.max(responded, fullFetchResponded), lastBatchMs: batchDuration } }));
+          }
+        } catch (e) {
+          // ignore
+        }
+      } catch (error: unknown) {
+        // ignore batch-level errors; continue
       }
     }
   }
@@ -134,8 +258,16 @@ export async function fetchPodCredits(): Promise<Record<string, number>> {
   try {
     const response = await axios.get('https://podcredits.xandeum.network/api/pods-credits');
     return response.data; // { pubkey: credits }
-  } catch (error) {
-    console.warn('Failed to fetch pod credits:', error);
+  } catch (error: unknown) {
+    const msg = (() => {
+      if (error == null) return '';
+      if (typeof error === 'object') {
+        const e = error as { message?: unknown };
+        if (typeof e.message === 'string') return e.message;
+      }
+      return String(error);
+    })();
+    console.warn('Failed to fetch pod credits:', msg);
     return {};
   }
 }
@@ -157,7 +289,22 @@ export function groupByVersion(nodes: PNode[]) {
 }
 
 // Convert real PNode to the app's PNode interface (for compatibility)
-export function mapToAppPNode(realNode: PNode): any { // Using any for now, adjust to match app's PNode
+export interface AppPNode {
+  id: string;
+  address: string;
+  status: 'online' | 'offline' | 'syncing';
+  uptime: number;
+  capacity: number;
+  peers: unknown | null;
+  lastSeen: Date;
+  region: string;
+  country?: string;
+  version: string;
+  stake: number;
+  isTop: boolean;
+}
+
+export function mapToAppPNode(realNode: PNode): AppPNode {
   const maxUptimeSeconds = 30 * 24 * 3600; // 30 days
   const uptimePercent = Math.min(100, (realNode.uptime / maxUptimeSeconds) * 100);
   return {
@@ -166,7 +313,7 @@ export function mapToAppPNode(realNode: PNode): any { // Using any for now, adju
     status: realNode.status || 'offline',
     uptime: Math.round(uptimePercent * 10) / 10, // Round to 1 decimal
     capacity: realNode.storage_committed / (1024 ** 3), // GB
-    peers: (realNode as any).peers ?? null, // Keep null when not provided so UI can show 'N/A'
+    peers: (realNode as unknown as Record<string, unknown>).peers ?? null, // Keep null when not provided so UI can show 'N/A'
     lastSeen: realNode.last_seen_timestamp ? new Date(realNode.last_seen_timestamp * 1000) : new Date(),
     region: realNode.region || 'Unknown',
     // try to extract a country name from region (e.g., "Grand Est, France" -> "France")

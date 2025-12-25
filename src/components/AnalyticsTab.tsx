@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { TooltipProps } from 'recharts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { PNode } from "@/components/PNodeTable";
+import CentralizationAlert from '@/components/CentralizationAlert';
 import { computeNetworkHealth } from "@/lib/stats";
 import { toast } from "@/hooks/use-toast";
 
@@ -42,6 +44,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [hoveredName, setHoveredName] = useState<string | null>(null);
   const [showOtherDetails, setShowOtherDetails] = useState(false);
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
 
   const handleGlobeLocationClick = useCallback((region: string) => {
     setRegionFilter(prev => prev === region ? null : region);
@@ -146,17 +149,17 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
   // Version Distribution
   const versionData = useMemo(() => {
     const versions = nodes.reduce((acc, node) => {
-      // Group versions (e.g., 0.8.0, 0.8.1 -> 0.8.x)
-      const parts = node.version.split(".");
-      const groupedVersion = parts.length >= 2 ? `${parts[0]}.${parts[1]}.x` : node.version;
+      const v = typeof node.version === 'string' && node.version ? node.version : 'unknown';
+      if (!v) return acc;
+      const parts = v.split(".");
+      const groupedVersion = parts.length >= 2 ? `${parts[0]}.${parts[1]}.x` : v;
       acc[groupedVersion] = (acc[groupedVersion] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
-    return Object.entries(versions).map(([version, count]) => ({
-      version,
-      count,
-    })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+    return Object.entries(versions).map(([version, count]) => ({ version, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
   }, [nodes]);
 
   // Network Health Score (canonical) - include probe coverage so trust can be determined
@@ -167,13 +170,46 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
   const healthScore = health.networkHealth;
   const healthData = [{ name: "Health", value: healthScore, fill: "url(#healthGradient)" }];
 
+  // Centralization detection: aggregate stake and capacity by region
+  const centralization = useMemo(() => {
+    const stakeByRegion: Record<string, number> = {};
+    const capByRegion: Record<string, number> = {};
+    let totalStake = 0;
+    let totalCap = 0;
+    for (const n of nodes) {
+      const r = n.region || 'Unknown';
+      const s = Number(n.stake ?? 0);
+      const c = Number(n.capacity ?? 0);
+      stakeByRegion[r] = (stakeByRegion[r] || 0) + s;
+      capByRegion[r] = (capByRegion[r] || 0) + c;
+      totalStake += s;
+      totalCap += c;
+    }
+    const stakeEntries = Object.entries(stakeByRegion).sort((a,b)=>b[1]-a[1]);
+    const capEntries = Object.entries(capByRegion).sort((a,b)=>b[1]-a[1]);
+    const topStake = stakeEntries[0];
+    const topCap = capEntries[0];
+    const topRegion = topStake?.[0] || topCap?.[0] || null;
+    const stakePct = topStake && totalStake > 0 ? (topStake[1] / totalStake) * 100 : 0;
+    const capacityPct = topCap && totalCap > 0 ? (topCap[1] / totalCap) * 100 : 0;
+    return { topRegion, stakePct, capacityPct };
+  }, [nodes]);
+
   // Key Metrics
-  const metrics = useMemo(() => ({
-    avgUptime: (nodes.reduce((acc, n) => acc + n.uptime, 0) / nodes.length).toFixed(1),
-    avgCapacity: (nodes.reduce((acc, n) => acc + n.capacity, 0) / nodes.length).toFixed(1),
-    totalPeers: nodes.reduce((acc, n) => acc + n.peers, 0),
-    totalStake: (nodes.reduce((acc, n) => acc + n.stake, 0) / 1000000).toFixed(2),
-  }), [nodes]);
+  // safe metrics computation (avoid NaN / exceptions when nodes is empty or fields missing)
+  const metrics = useMemo(() => {
+    const total = nodes.length || 0;
+    const sumUptime = nodes.reduce((acc, n) => acc + (Number(n.uptime) || 0), 0);
+    const sumCapacity = nodes.reduce((acc, n) => acc + (Number(n.capacity) || 0), 0);
+    const totalPeers = nodes.reduce((acc, n) => acc + (Number(n.peers) || 0), 0);
+    const totalStake = nodes.reduce((acc, n) => acc + (Number(n.stake) || 0), 0);
+    return {
+      avgUptime: total > 0 ? (sumUptime / total).toFixed(1) : '0.0',
+      avgCapacity: total > 0 ? (sumCapacity / total).toFixed(1) : '0.0',
+      totalPeers,
+      totalStake: (totalStake / 1000000).toFixed(2),
+    };
+  }, [nodes]);
 
   // Status breakdown
   const statusBreakdown = useMemo(() => ({
@@ -191,7 +227,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
 
   const [hoveredCapacityIndex, setHoveredCapacityIndex] = useState<number | null>(null);
 
-  const CapacityTooltip = ({ active, payload }: any) => {
+  const CapacityTooltip = ({ active, payload }: TooltipProps<number, string>) => {
     if (!active || !payload || !payload.length) return null;
     const data = payload[0].payload;
     const total = nodes.length || 1;
@@ -206,7 +242,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
   };
 
   // Custom Pie tooltip for count + percent
-  const PieTooltip = ({ active, payload }: any) => {
+  const PieTooltip = ({ active, payload }: TooltipProps<number, string>) => {
     if (!active || !payload || !payload.length) return null;
     const data = payload[0].payload;
     const percent = ((data.value / Math.max(1, regionalTotal)) * 100).toFixed(0);
@@ -221,10 +257,10 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
   // Export functions
   const exportToCSV = () => {
     const headers = ["ID", "Address", "Status", "Uptime", "Capacity", "Peers", "Stake", "Version", "Region"];
-    const rows = nodes.map(n => [
+    const rows = filteredNodes.map(n => [
       n.id, n.address, n.status, n.uptime, n.capacity, n.peers, n.stake, n.version, n.region
     ]);
-    const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
+    const csvContent = [headers, ...rows].map(row => row.map(c => String(c ?? '').replace(/"/g, '""')).map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -232,15 +268,23 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
     a.download = `xandeum-pnodes-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Exported to CSV", description: `${nodes.length} pNodes exported successfully` });
+    toast({ title: "Exported to CSV", description: `${filteredNodes.length} pNodes exported successfully` });
   };
 
   const exportToJSON = () => {
-    // Trigger table to export current filtered+sorted view as JSON
     try {
-      window.dispatchEvent(new Event('xandeum:export-json'));
+      const payload = filteredNodes.map(n => ({ id: n.id, address: n.address, status: n.status, uptime: n.uptime, capacity: n.capacity, peers: n.peers, stake: n.stake, version: n.version, region: n.region }));
+      const jsonContent = JSON.stringify(payload, null, 2);
+      const blob = new Blob([jsonContent], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `xandeum-pnodes-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Exported JSON', description: `${filteredNodes.length} pNodes exported successfully` });
     } catch (e) {
-      console.error('Export JSON trigger failed', e);
+      console.error('Export JSON failed', e);
       toast({ title: 'Export failed' });
     }
   };
@@ -305,6 +349,9 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
       </div>
 
       {/* Key Metrics Row */}
+      {centralization.topRegion && (
+        <CentralizationAlert topRegion={centralization.topRegion} stakePct={centralization.stakePct} capacityPct={centralization.capacityPct} threshold={30} />
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           icon={<TrendingUp className="h-5 w-5" />}
@@ -567,7 +614,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
                 const centroid = countryCentroids[key] || countryCentroids[countryKey];
                 const matchedNodes = nodes.filter(n => (n.region || '').toLowerCase().includes((key || '').split(',').slice(-1)[0].trim().toLowerCase()));
                 return centroid ? { name: key, lat: centroid.lat, lon: centroid.lon, count: r.value, nodes: matchedNodes, color: r.fill } : null;
-              }).filter(Boolean as any);
+              }).filter((c): c is { name: string; lat: number; lon: number; count: number; nodes: PNode[]; color: string } => c !== null);
               return <GlobeLazy nodes={nodes} regionClusters={clusters} />;
             })()
           }

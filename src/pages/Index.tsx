@@ -10,6 +10,7 @@ import { AnalyticsTab } from "@/components/AnalyticsTab";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, BarChart3, Trophy } from "lucide-react";
+import PrpcProgress from "@/components/PrpcProgress";
 import { fetchPNodes, fetchPodCredits, mapToAppPNode } from "@/lib/prpc";
 import NodeDetailsModal from '@/components/NodeDetailsModal';
 import { VirtualizedGrid } from "@/components/VirtualizedGrid";
@@ -26,11 +27,12 @@ const Index = () => {
 
   const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
   const [lastSource, setLastSource] = useState<string | undefined>(undefined);
-  const [lastRawJson, setLastRawJson] = useState<any>(null);
+  const [lastRawJson, setLastRawJson] = useState<unknown>(null);
   const [coverageAttempted, setCoverageAttempted] = useState<number | null>(null);
   const [coverageResponded, setCoverageResponded] = useState<number | null>(null);
   const [lastFetchDurationMs, setLastFetchDurationMs] = useState<number | null>(null);
-  const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const [prpcProgress, setPrpcProgress] = useState<any>(null);
+  const [selectedNode, setSelectedNode] = useState<PNode | null>(null);
   const [refreshInterval, setRefreshInterval] = useState<number>(60000); // ms, 0 = off
 
   const loadData = async () => {
@@ -61,7 +63,7 @@ const Index = () => {
 
       const enrichedNodes = nodeData.map(node => ({ ...node, stake: findCredit(node.pubkey) || 0 }));
       const mappedNodes = enrichedNodes.map(mapToAppPNode);
-      setNodes(mappedNodes);
+      setNodes(mappedNodes as unknown as PNode[]);
       // persist last successful fetch to localStorage for offline fallback
       try {
         const payload = { ts: Date.now(), nodes: mappedNodes };
@@ -103,7 +105,7 @@ const Index = () => {
     }
 
     // Globe selection listener: filter table by region or open node details
-    function onGlobeSelect(e: any) {
+    function onGlobeSelect(e: CustomEvent<{ region?: string; nodes?: PNode[] }>) {
       const detail = e?.detail;
       if (!detail) return;
       const region = detail.region;
@@ -118,9 +120,19 @@ const Index = () => {
     }
     window.addEventListener('xandeum:globe-select', onGlobeSelect as EventListener);
 
+    function onPrpcProgress(e: CustomEvent<any>) {
+      const d = e?.detail;
+      if (!d) return;
+      setPrpcProgress(d);
+      // clear after few seconds
+      setTimeout(() => setPrpcProgress(null), 4000);
+    }
+    window.addEventListener('xandeum:prpc-progress', onPrpcProgress as EventListener);
+
     return () => {
       if (intervalId) clearInterval(intervalId);
       window.removeEventListener('xandeum:globe-select', onGlobeSelect as EventListener);
+      window.removeEventListener('xandeum:prpc-progress', onPrpcProgress as EventListener);
     };
   }, [refreshInterval]);
 
@@ -163,7 +175,22 @@ const Index = () => {
     return s.sort((a,b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })).reverse();
   }, [nodes]);
 
-  const stats = useMemo(() => {
+  interface NetworkStatsType {
+    totalNodes: number;
+    activeNodes: number;
+    avgUptime: number;
+    totalCapacity: string;
+    avgResponseTime: number;
+    networkHealth: number;
+    availabilityScore: number;
+    uptimeScore: number;
+    versionScore: number;
+    coverageAttempted: number | null;
+    coverageResponded: number | null;
+    lastFetchDurationMs: number | null;
+  }
+
+  const stats = useMemo<NetworkStatsType>(() => {
     const total = nodes.length || 0;
     const active = nodes.filter(n => n.status === "online").length;
     const avgUptime = total > 0 ? nodes.reduce((acc, n) => acc + n.uptime, 0) / total : 0;
@@ -201,15 +228,13 @@ const Index = () => {
       totalCapacity: `${(totalCapacity / 1024).toFixed(2)} TB`,
       avgResponseTime: avgResponse,
       networkHealth,
-      // breakdown for UI tooltip
       availabilityScore,
       uptimeScore,
       versionScore: vScore,
-      // provenance / coverage
       coverageAttempted: coverageAttempted,
       coverageResponded: coverageResponded,
       lastFetchDurationMs,
-    } as any;
+    };
   }, [nodes]);
 
   const statusData = useMemo(() => [
@@ -256,6 +281,7 @@ const Index = () => {
         {/* Verification card moved to header (keeps dashboard clean) */}
 
         {/* Network Stats */}
+        <PrpcProgress progress={prpcProgress} />
         <NetworkStats stats={stats} lastUpdated={new Date()} />
 
 
@@ -302,9 +328,6 @@ const Index = () => {
                 sourceUrl={lastSource}
                 rawJson={lastRawJson}
                 podsCount={nodes.length}
-                coverageAttempted={coverageAttempted}
-                coverageResponded={coverageResponded}
-                fetchDurationMs={lastFetchDurationMs}
               />
             </div>
 
