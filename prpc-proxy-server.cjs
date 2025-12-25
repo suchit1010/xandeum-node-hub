@@ -3,6 +3,15 @@ const fetch = require('node-fetch');
 const app = express();
 app.use(express.json());
 
+// Simple CORS middleware so browsers can call this service from other origins
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // Simple in-memory geo cache: ip -> { region, expiresAt }
 const GEO_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const geoCache = new Map();
@@ -121,6 +130,7 @@ app.post('/api/prpc-proxy', async (req, res) => {
   return res.status(502).json({ error: 'proxy_failed', details: lastError && lastError.message ? lastError.message : String(lastError), code: lastError && lastError.code ? lastError.code : null });
 });
 
-app.listen(3001, () => {
-  console.log('Proxy server running on http://localhost:3001');
+const port = process.env.PORT || 3001;
+app.listen(port, () => {
+  console.log(`Proxy server running on http://localhost:${port}`);
 });

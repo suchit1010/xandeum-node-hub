@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "test:proxy": "node scripts/test-proxy.cjs",
+    "start:proxy": "node prpc-proxy-server.cjs",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
+    
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
