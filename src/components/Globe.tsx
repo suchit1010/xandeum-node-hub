@@ -1,170 +1,148 @@
-import * as React from "react";
-import { useMemo, useRef, useState, useEffect } from "react";
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { OrbitControls, Stars, Html, PerspectiveCamera } from "@react-three/drei";
+import React, { useEffect, useRef, useMemo } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import ThreeGlobe from "three-globe";
 import * as THREE from "three";
-import { TextureLoader } from "three";
+import gsap from "gsap";
+import type { OrbitControls as ThreeOrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
-// CORE DATA TYPES
-type PNode = { lat?: number; lon?: number; region?: string; uptime?: number; lastSeen?: string; };
+// --- CONFIGURATION & DATA ---
+const GEOJSON_URL = 'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/country-polygons/ne_110m_admin_0_countries.geojson';
 
-// RUTHLESSLY BETTER TEXTURED EARTH
-function XandeumEarth() {
-  // Use high-contrast textures for a "Cyberpunk" look
-  const [colorMap, bumpMap, specMap] = useLoader(TextureLoader, [
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atk.jpg',
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg',
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_lights_2048.png'
-  ]);
-
-  return (
-    <group>
-      {/* GLOWING ATMOSPHERE */}
-      <mesh scale={[1.04, 1.04, 1.04]}>
-        <sphereGeometry args={[2, 64, 64]} />
-        <meshBasicMaterial color="#2dd4bf" transparent opacity={0.03} side={THREE.BackSide} />
-      </mesh>
-      
-      {/* THE MAIN BODY */}
-      <mesh>
-        <sphereGeometry args={[2, 64, 64]} />
-        <meshStandardMaterial 
-          map={colorMap} 
-          bumpMap={bumpMap} 
-          bumpScale={0.05}
-          emissiveMap={specMap} // Shows city lights in dark areas
-          emissive={new THREE.Color("#2dd4bf")}
-          emissiveIntensity={0.2}
-          roughness={0.7}
-          metalness={0.2}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-// DATA-DRIVEN P-NODE CLUSTER
-type PNodeClusterProps = {
-  pos: THREE.Vector3;
+type Office = {
+  lat: number;
+  lng: number;
+  name: string;
   color: string;
-  count: number;
-  title: string;
-  onClick?: (e?: unknown) => void;
+  mainHub?: boolean;
 };
 
-function PNodeCluster({ pos, color, count, title, onClick }: PNodeClusterProps) {
-  const meshRef = useRef<THREE.Mesh>(null!);
-  const ringRef = useRef<THREE.Mesh>(null!);
-  const [hover, setHover] = useState(false);
+const OFFICES: Office[] = [
+  { lat: 1.3521, lng: 103.8198, name: "Singapore", color: "#ffcc00", mainHub: true },
+  { lat: 51.5074, lng: -0.1278, name: "London", color: "#ff3366" },
+  { lat: 37.7749, lng: -122.4194, name: "San Francisco", color: "#33ffaa" },
+  { lat: 28.6139, lng: 77.2090, name: "Bangalore", color: "#aa33ff" },
+  { lat: 48.8566, lng: 2.3522, name: "Paris", color: "#3366ff" },
+  { lat: -33.8688, lng: 151.2093, name: "Sydney", color: "#ff8800" },
+];
 
-  // LOGARITHMIC SCALING (Visual impact without blocking landmasses)
-  const baseScale = 0.04 + Math.log10(count + 1) * 0.08;
+// --- GLOBE COMPONENT ---
+const GlobeCore = () => {
+  const globeRef = useRef<THREE.Group>(null!);
+  const { camera, controls } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls?: ThreeOrbitControls };
 
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
-    // Core Pulse
-    meshRef.current.scale.setScalar(baseScale * (1 + Math.sin(t * 3) * 0.15));
-    // Data Flow Ring
-    if (ringRef.current) {
-      ringRef.current.scale.setScalar(baseScale * (1.5 + Math.sin(t * 2) * 1.5));
-      const material = Array.isArray(ringRef.current.material)
-        ? (ringRef.current.material[0] as THREE.MeshBasicMaterial)
-        : (ringRef.current.material as THREE.MeshBasicMaterial);
-      if (material) {
-        material.opacity = 0.4 * (1 - (Math.sin(t * 2) + 1) / 2);
-        material.transparent = true;
+  // 1. Camera Animation Logic (Fly-To)
+  const flyTo = (lat: number, lng: number) => {
+    // Convert Lat/Lng to 3D coords for camera positioning
+    const r = 200; // Globe internal radius
+    const phi = (90 - lat) * (Math.PI / 180);
+    const theta = (lng + 180) * (Math.PI / 180);
+
+    const x = -(r * Math.sin(phi) * Math.cos(theta));
+    const y = r * Math.cos(phi);
+    const z = r * Math.sin(phi) * Math.sin(theta);
+
+    // Stop auto-rotation during flight
+    if (controls) controls.autoRotate = false;
+
+    gsap.to(camera.position, {
+      x: x * 2.2, // Zoom distance multiplier
+      y: y * 2.2,
+      z: z * 2.2,
+      duration: 1.8,
+      ease: "power3.inOut",
+      onUpdate: () => camera.lookAt(0, 0, 0),
+      onComplete: () => {
+        if (controls) controls.autoRotate = true;
       }
-    }
-  });
+    });
+  };
 
-  return (
-    <group position={pos.toArray()}>
-      {/* Pulse Data Ring */}
-      <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.1, 0.15, 32]} />
-        <meshBasicMaterial color={color} transparent opacity={0.3} side={THREE.DoubleSide} />
-      </mesh>
+  // 2. Initialize ThreeGlobe
+  const globeInstance = useMemo(() => {
+    const Globe = new ThreeGlobe()
+      // Dotted Landmass
+      .hexPolygonsData([]) 
+      .hexPolygonResolution(3)
+      .hexPolygonMargin(0.7)
+      .hexPolygonColor(() => "#444444")
+      
+      // Office Markers
+      .labelsData(OFFICES)
+      .labelDotRadius(0.6)
+      .labelSize(1.2)
+      .labelColor((d: Office) => d.color)
+      .labelText((d: Office) => d.name)
+      .labelIncludeDot(true)
+      
+      // The Pulse Effect (specifically for Singapore)
+      .ringsData(OFFICES.filter(o => o.mainHub))
+      .ringColor(() => "#ffcc00")
+      .ringMaxRadius(5)
+      .ringPropagationSpeed(2)
+      .ringRepeatPeriod(1500);
 
-      {/* Node Core */}
-      <mesh 
-        ref={meshRef}
-        onClick={onClick}
-        onPointerOver={() => setHover(true)}
-        onPointerOut={() => setHover(false)}
-      >
-        <sphereGeometry args={[1, 16, 16]} />
-        <meshStandardMaterial 
-          color={color} 
-          emissive={color} 
-          emissiveIntensity={hover ? 4 : 2} 
-        />
-      </mesh>
-
-      {hover && (
-        <Html center position={[0, baseScale + 0.2, 0]} distanceFactor={8}>
-          <div className="bg-black/90 border border-primary/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-white shadow-2xl">
-            <p className="text-[10px] font-bold tracking-tighter uppercase text-primary/80">Xandeum Cluster</p>
-            <p className="text-xs font-mono">{title}</p>
-          </div>
-        </Html>
-      )}
-    </group>
-  );
-}
-
-export default function XandeumGlobe({ nodes = [] }: { nodes: PNode[] }) {
-  // CLUSTERING LOGIC: Group nodes by rounded lat/lon to avoid overlap
-  const clusters = useMemo(() => {
-    const map: Record<string, { lat: number; lon: number; nodes: PNode[] }> = {};
-    nodes.forEach(n => {
-      const lat = n.lat || 0;
-      const lon = n.lon || 0;
-      const key = `${Math.round(lat / 5) * 5}:${Math.round(lon / 5) * 5}`;
-      if (!map[key]) map[key] = { lat, lon, nodes: [] };
-      map[key].nodes.push(n);
+    // Interaction: attach handler via any-cast because typings may not include onLabelClick
+    (Globe as any).onLabelClick((label: Office) => {
+      flyTo(label.lat, label.lng);
     });
 
-    return Object.values(map).map(c => ({
-      pos: latLonToVector3(c.lat, c.lon, 2.05),
-      count: c.nodes.length,
-      title: `${c.nodes.length} Nodes in ${c.nodes[0].region || 'Global'}`,
-      color: c.nodes.every(n => (n.uptime || 0) > 95) ? "#2dd4bf" : "#f59e0b"
-    }));
-  }, [nodes]);
+    // Load Landmass Data
+    fetch(GEOJSON_URL)
+      .then(res => res.json())
+      .then(countries => {
+        Globe.hexPolygonsData(countries.features);
+      });
 
+    return Globe;
+  }, []);
+
+  // 3. Mount Globe to Three.js Scene
+  useEffect(() => {
+    if (globeRef.current) {
+      globeRef.current.add(globeInstance);
+    }
+  }, [globeInstance]);
+
+  // Handle cursor changes on hover
+  useEffect(() => {
+    (globeInstance as any).onLabelHover((label: any) => {
+      document.body.style.cursor = label ? "pointer" : "default";
+    });
+  }, [globeInstance]);
+
+  return <group ref={globeRef} scale={[0.02, 0.02, 0.02]} />;
+};
+
+// --- MAIN EXPORT ---
+export default function InteractiveGlobe() {
   return (
-    <div className="h-[500px] w-full bg-[#0b1220] rounded-2xl border border-white/5 overflow-hidden">
-      <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={45} />
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} intensity={1.5} color="#2dd4bf" />
-        
-        <XandeumEarth />
-        <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade />
+    <div className="h-screen w-full bg-white flex items-center justify-center relative">
+      {/* Optional Overlay UI */}
+      <div className="absolute top-10 left-10 z-10 pointer-events-none">
+        <h1 className="text-3xl font-bold text-gray-900">Global Network</h1>
+        <p className="text-gray-500">Click a city to explore</p>
+      </div>
 
-        {clusters.map((c, i) => (
-          <PNodeCluster key={i} {...c} />
-        ))}
+      <Canvas shadows antialias="true">
+        <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={45} />
+        
+        {/* Soft lighting to match the clean aesthetic */}
+        <ambientLight intensity={1.5} />
+        <pointLight position={[10, 10, 10]} intensity={1} />
+        <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} />
+
+        <GlobeCore />
 
         <OrbitControls 
-          enablePan={false} 
-          autoRotate 
-          autoRotateSpeed={0.5} 
-          minDistance={3.5} 
-          maxDistance={7} 
+          enablePan={false}
+          enableZoom={true}
+          autoRotate={true}
+          autoRotateSpeed={0.5}
+          minDistance={6}
+          maxDistance={15}
         />
       </Canvas>
     </div>
-  );
-}
-
-// UTILITY
-function latLonToVector3(lat: number, lon: number, radius: number) {
-  const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lon + 180) * (Math.PI / 180);
-  return new THREE.Vector3(
-    -(radius * Math.sin(phi) * Math.cos(theta)),
-    radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.sin(theta)
   );
 }

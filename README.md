@@ -1,73 +1,70 @@
-# Welcome to your Lovable project
+# Xandeum pNode Dashboard
 
-## Project info
+![Xandeum logo](src/assets/xandeum-x-logo.png)
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Real-time analytics dashboard for Xandeum pNodes using pRPC gossip — built for the pNode Analytics Bounty.
 
-## How can I edit this code?
+[![Bounty Status](https://img.shields.io/badge/Bounty-Submitted-brightgreen)](https://superteam.example) [![Tech: React](https://img.shields.io/badge/Tech-React-blue)](https://reactjs.org) [![License: MIT](https://img.shields.io/badge/License-MIT-green)]
 
-There are several ways of editing your application.
+TL;DR: Clone, `npm install`, `npm run dev`, open http://localhost:5173 — the dashboard fetches live pNode metrics via pRPC, shows an interactive 3D globe, and provides a sortable/filterable pNode table with CSV/JSON export.
 
-**Use Lovable**
+Links
+- Docs: ./docs (pRPC integration, deployment, architecture, contribution)
+- Demo GIFs/screenshots: ./docs/assets (place screenshots here)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Key Features
+- ✅ Real-time pNode fetching via pRPC gossip (live metrics)
+- 🌍 Interactive 3D globe for geo visualization (click to filter)
+- 📊 Sortable, filterable, paginated table with copy/export and highlights
+- ⚡ Responsive UI with loading overlay and progress visualization
 
-Changes made via Lovable will be committed automatically to this repo.
+Why this meets the bounty
+- Functionality: Live pRPC fetch, exports, and interactive filters.
+- Clarity: Single-page dashboard with clear controls and data provenance.
+- UX: Fast, responsive, accessible controls and copy/export options.
+- Innovation: Globe-driven filtering + region-aware CSV/JSON exports.
 
-**Use your preferred IDE**
+Quick Start
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Clone the repo:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+git clone <repo-url>
+cd xandeum-node-hub
+npm ci
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+2. Open the app: http://localhost:5173
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Prove it's working (verification)
+- Fetch raw pRPC endpoint used by the app (example bootstrap):
 
-**Use GitHub Codespaces**
+```bash
+curl -X POST 'http://173.212.220.65:6000/rpc' \
+	-H 'Content-Type: application/json' \
+	-d '{"jsonrpc":"2.0","id":1,"method":"get-pods-with-stats","params":{}}'
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+You should receive JSON containing pNodes and stats. The dashboard maps those fields (id, address, status, uptime, capacity, region, version, stake).
 
-## What technologies are used for this project?
+Files to read first
+- `src/lib/prpc.ts` — core fetch & retry logic.
+- `src/pages/Index.tsx` — app entry: fetches data, wires filters, and renders `PNodeTable`.
+- `src/components/PNodeTable.tsx` — table markup, sorting, CSV/JSON export.
 
-This project is built with:
+Docs
+- See the `/docs` folder for focused docs: pRPC-Integration, Deployment-Guide, Contribution-Guide, Architecture, CHANGELOG.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Screenshots / Demo
+- Add short GIFs or screenshots to `docs/assets/` and reference them here for judges.
 
-## How can I deploy this project?
+Contributing
+- See `docs/Contribution-Guide.md` for how to run tests and request features.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+License & Contact
+- MIT License — see LICENSE file.
+- Built for the Xandeum pNode Analytics Bounty. Questions: maintainer@example.com
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
+This README is the single entry point for judges: it includes verification steps, feature mapping to bounty criteria, and links to deeper docs in `/docs`.

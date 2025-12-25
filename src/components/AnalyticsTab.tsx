@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 import React, { Suspense } from 'react';
 import { countryCentroids } from '@/lib/geo';
-const GlobeLazy = React.lazy(() => import('./GlobeClean'));
+interface GlobeCluster { name: string; lat: number; lon: number; count: number; nodes: PNode[]; color: string; }
+interface GlobeProps { nodes: PNode[]; regionClusters: GlobeCluster[]; }
+const GlobeLazy = React.lazy(() => import('./GlobeClean')) as React.LazyExoticComponent<React.ComponentType<GlobeProps>>;
 import { Button } from "@/components/ui/button";
 import {
   Tooltip as TooltipUI,
@@ -446,7 +448,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
               <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart
                   cx="50%"
-                  cy="50%"
+                  cy="54%"
                   innerRadius="60%"
                   outerRadius="100%"
                   startAngle={180}
@@ -467,8 +469,8 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
                 </RadialBarChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-bold gradient-text">{healthScore}</span>
-                <span className="text-sm text-muted-foreground">out of 100</span>
+                <span className="text-4xl font-bold gradient-text leading-none pt-10">{healthScore}</span>
+                <span className="text-sm text-muted-foreground mt-0.1 mb-0.1">out of 100</span>
                 <div className="mt-2 flex items-center gap-2">
                   {health.trusted ? (
                     <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 text-xs px-2 py-1 rounded-full">
@@ -613,9 +615,13 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
                 const countryKey = key.split(',').slice(-1)[0].trim();
                 const centroid = countryCentroids[key] || countryCentroids[countryKey];
                 const matchedNodes = nodes.filter(n => (n.region || '').toLowerCase().includes((key || '').split(',').slice(-1)[0].trim().toLowerCase()));
-                return centroid ? { name: key, lat: centroid.lat, lon: centroid.lon, count: r.value, nodes: matchedNodes, color: r.fill } : null;
+              return centroid ? { name: key, lat: centroid.lat, lon: centroid.lon, count: r.value, nodes: matchedNodes, color: r.fill } : null;
               }).filter((c): c is { name: string; lat: number; lon: number; count: number; nodes: PNode[]; color: string } => c !== null);
-              return <GlobeLazy nodes={nodes} regionClusters={clusters} />;
+              const GlobeComponent = GlobeLazy as React.ComponentType<{
+                nodes: PNode[];
+                regionClusters: { name: string; lat: number; lon: number; count: number; nodes: PNode[]; color: string }[];
+              }>;
+              return <GlobeComponent nodes={nodes} regionClusters={clusters} />;
             })()
           }
         </Suspense>
