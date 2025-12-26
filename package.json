@@ -7,6 +7,7 @@
     "dev": "vite",
     "test:proxy": "node scripts/test-proxy.cjs",
     "start:proxy": "node prpc-proxy-server.cjs",
+    "start": "node prpc-proxy-server.cjs",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
