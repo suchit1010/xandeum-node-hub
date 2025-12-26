@@ -16,7 +16,6 @@ import { fetchPNodes, fetchPodCredits, mapToAppPNode } from "@/lib/prpc";
 import NodeDetailsModal from '@/components/NodeDetailsModal';
 import { VirtualizedGrid } from "@/components/VirtualizedGrid";
 
-const API_URL = "/api/prpc-proxy";
 
 const Index = () => {
   const [nodes, setNodes] = useState<PNode[]>([]);
@@ -44,6 +43,14 @@ const Index = () => {
     setError(null);
     try {
       const [pResp, creditData] = await Promise.all([fetchPNodes(), fetchPodCredits()]);
+      // Debug: log proxy response and credit data to help diagnose empty dashboard
+      // (temporary - remove after debugging)
+      // eslint-disable-next-line no-console
+      console.debug('prpc fetch response', pResp);
+      // eslint-disable-next-line no-console
+      console.debug('prpc meta', pResp.meta);
+      // eslint-disable-next-line no-console
+      console.debug('pod credits', creditData);
       // pResp: { nodes, raw, source }
       const nodeData = pResp.nodes || [];
       // Robust stake merge: try exact pubkey, trimmed keys, and fallback by prefix match
