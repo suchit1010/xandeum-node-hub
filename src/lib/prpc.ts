@@ -31,6 +31,13 @@ const bootstrapEndpoints = [
   'http://173.212.203.145:6000/rpc',
 ];
 
+// Runtime API URL selection: prefer a runtime override, then Vite env, then the known working Render proxy.
+const RUNTIME_API_URL = (typeof window !== 'undefined' && (window as any).__PRPC_PROXY_URL) ?? (import.meta as any).env?.VITE_PRPC_PROXY_URL ?? 'https://prpc-proxy.onrender.com/api/prpc-proxy';
+if (typeof window !== 'undefined') {
+  try { (window as any).__PRPC_PROXY_USED = RUNTIME_API_URL; } catch (e) { /* ignore */ }
+  // expose for debugging
+  try { console.debug('pRPC proxy (runtime):', RUNTIME_API_URL); } catch (e) { /* ignore */ }
+}
 export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; source?: string; meta?: { attempted: number; responded: number; durationMs: number } }> {
   const methods = ['get-pods-with-stats', 'get-pods']; // Primary for stats, fallback for basic list
   // Helper: perform a proxy request with timeout + retries and quiet handling for aborts/timeouts
@@ -56,11 +63,11 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
       },
       opts?: { timeout?: number; retries?: number }
     ) => {
-      const timeout = opts?.timeout ?? 8000;
-      const retries = Math.max(1, opts?.retries ?? 1);
+      const timeout = opts?.timeout ?? 12000;
+      const retries = Math.max(1, opts?.retries ?? 2);
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-          const res = await axios.post('/api/prpc-proxy', { url, payload }, { timeout });
+          const res = await axios.post(RUNTIME_API_URL, { url, payload }, { timeout });
           return res;
         } catch (err: unknown) {
           if (isAbortLike(err)) {
@@ -112,7 +119,7 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
     try {
       const endpoints = _.shuffle(bootstrapEndpoints);
       const attemptPromises = endpoints.map(async (url) => {
-        const response = await doProxyRequest(url, { jsonrpc: '2.0', id: 1, method, params: [] }, { timeout: 8000, retries: 1 });
+        const response = await doProxyRequest(url, { jsonrpc: '2.0', id: 1, method, params: [] }, { timeout: 12000, retries: 2 });
         if (!response) throw new Error('no response');
         const result = response.data?.result;
         let nodesArray: unknown[] | undefined;
@@ -124,15 +131,30 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
           nodesArray = response.data as unknown[];
         }
         if (!nodesArray || !Array.isArray(nodesArray) || nodesArray.length === 0) throw new Error('no nodes');
+        // More tolerant PNode detection: accept when pubkey/address exist and coerce uptime when possible
         const isPNode = (obj: unknown): obj is PNode => {
           if (obj == null || typeof obj !== 'object') return false;
           const o = obj as Record<string, unknown>;
-          return typeof o.pubkey === 'string' && typeof o.address === 'string' && typeof o.uptime === 'number';
+          if (typeof o.pubkey !== 'string' || typeof o.address !== 'string') return false;
+          // uptime may be missing or string — tolerate and coerce
+          const uptimeRaw = o.uptime;
+          if (uptimeRaw == null) return true; // accept — we'll treat missing uptime as 0
+          if (typeof uptimeRaw === 'number') return true;
+          if (typeof uptimeRaw === 'string' && uptimeRaw.trim() !== '' && !Number.isNaN(Number(uptimeRaw))) return true;
+          return false;
         };
-        const mapped = nodesArray.filter(isPNode).map((node) => ({
-          ...node,
-          status: node && node.uptime && node.uptime > 0 ? 'online' : 'offline',
-        }));
+        const mapped = nodesArray.filter(isPNode).map((node) => {
+          const n = node as unknown as Record<string, unknown>;
+          // coerce uptime to number
+          let uptime = 0;
+          if (typeof n.uptime === 'number') uptime = n.uptime as number;
+          else if (typeof n.uptime === 'string' && n.uptime.trim() !== '') uptime = Number(n.uptime);
+          return {
+            ...(node as object),
+            uptime,
+            status: uptime > 0 ? 'online' : 'offline',
+          } as unknown as PNode;
+        });
         const meta = { attempted: bootstrapEndpoints.length, responded: Math.max(responded, 1), durationMs: Date.now() - probeStart };
         return { nodes: mapped as unknown as PNode[], raw: response.data, source: url, meta };
       });
@@ -198,7 +220,7 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
       const batch = endpoints.slice(i, i + batchSize);
       const startBatch = Date.now();
       try {
-        const results = await Promise.all(batch.map((url) => doProxyRequest(url, { jsonrpc: '2.0', id: 1, method, params: [] }, { timeout: 8000, retries: 1 })));
+          const results = await Promise.all(batch.map((url) => doProxyRequest(url, { jsonrpc: '2.0', id: 1, method, params: [] }, { timeout: 12000, retries: 2 })));
         for (let j = 0; j < results.length; j++) {
           const response = results[j];
           const url = batch[j];
@@ -217,15 +239,26 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
           const isPNode = (obj: unknown): obj is PNode => {
             if (obj == null || typeof obj !== 'object') return false;
             const o = obj as Record<string, unknown>;
-            return typeof o.pubkey === 'string' && typeof o.address === 'string' && typeof o.uptime === 'number';
+            if (typeof o.pubkey !== 'string' || typeof o.address !== 'string') return false;
+            if (o.uptime == null) return true;
+            if (typeof o.uptime === 'number') return true;
+            if (typeof o.uptime === 'string' && o.uptime.trim() !== '' && !Number.isNaN(Number(o.uptime))) return true;
+            return false;
           };
 
           if (nodesArray && Array.isArray(nodesArray)) {
             fullFetchResponded++;
-            const mapped = nodesArray.filter(isPNode).map((node) => ({
-              ...node,
-              status: node && node.uptime && node.uptime > 0 ? 'online' : 'offline',
-            }));
+            const mapped = nodesArray.filter(isPNode).map((node) => {
+              const n = node as unknown as Record<string, unknown>;
+              let uptime = 0;
+              if (typeof n.uptime === 'number') uptime = n.uptime as number;
+              else if (typeof n.uptime === 'string' && n.uptime.trim() !== '') uptime = Number(n.uptime);
+              return {
+                ...(node as object),
+                uptime,
+                status: uptime > 0 ? 'online' : 'offline',
+              } as unknown as PNode;
+            });
             const meta = { attempted: bootstrapEndpoints.length, responded: Math.max(responded, fullFetchResponded), durationMs: Date.now() - probeStart };
             try {
               if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
