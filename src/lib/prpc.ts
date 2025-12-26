@@ -93,6 +93,43 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
 
   // Quick probe to estimate coverage: ping all bootstrap endpoints with a lightweight get-pods call (short timeout)
   const probeStart = Date.now();
+  // First try the server-side aggregated endpoint to get a single fast response
+  try {
+    if (typeof window !== 'undefined') console.debug('Attempting aggregate fetch from', RUNTIME_AGG_URL);
+    const aggRes = await axios.get(RUNTIME_AGG_URL, { timeout: 15000 });
+    const data = aggRes?.data;
+    const pods = data?.result?.pods ?? (Array.isArray(data) ? data : undefined);
+    if (Array.isArray(pods) && pods.length > 0) {
+      // reuse tolerant mapping
+      const isPNode = (obj: unknown): obj is PNode => {
+        if (obj == null || typeof obj !== 'object') return false;
+        const o = obj as Record<string, unknown>;
+        if (typeof o.pubkey !== 'string' || typeof o.address !== 'string') return false;
+        return true;
+      };
+      const mapped = pods.filter(isPNode).map((node) => {
+        const n = node as unknown as Record<string, unknown>;
+        let uptime = 0;
+        if (typeof n.uptime === 'number') uptime = n.uptime as number;
+        else if (typeof n.uptime === 'string' && n.uptime.trim() !== '') uptime = Number(n.uptime);
+        return {
+          ...(node as object),
+          uptime,
+          status: uptime > 0 ? 'online' : 'offline',
+        } as unknown as PNode;
+      });
+      const meta = { attempted: bootstrapEndpoints.length, responded: Math.max(responded, 1), durationMs: Date.now() - probeStart };
+      try {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          window.dispatchEvent(new CustomEvent('xandeum:prpc-progress', { detail: meta }));
+        }
+      } catch (e) { /* ignore */ }
+      return { nodes: mapped as unknown as PNode[], raw: data, source: RUNTIME_AGG_URL, meta };
+    }
+  } catch (e) {
+    // ignore aggregate errors and continue with fallback probing
+    console.debug('Aggregate fetch failed:', e && (e as any).message ? (e as any).message : e);
+  }
   const probePromises = bootstrapEndpoints.map(async (url) => {
     try {
       const r = await doProxyRequest(url, { jsonrpc: '2.0', id: 1, method: 'get-pods', params: [] }, { timeout: 3000, retries: 1 });
@@ -365,3 +402,5 @@ export function mapToAppPNode(realNode: PNode): AppPNode {
     isTop: false, // Can compute based on stake
   };
 }
+// Aggregated endpoint URL (server-side single-call cache)
+const RUNTIME_AGG_URL = (typeof window !== 'undefined' && (window as any).__PRPC_AGG_URL) ?? (import.meta as any).env?.VITE_PRPC_AGG_URL ?? 'https://prpc-proxy.onrender.com/api/aggregate-pods';
