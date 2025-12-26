@@ -2,6 +2,13 @@
 import axios from 'axios';
 import _ from 'lodash';
 
+declare global {
+  interface Window {
+    __PRPC_PROXY_URL?: string;
+    __PRPC_PROXY_USED?: string;
+  }
+}
+
 
 
 export interface PNode {
@@ -51,10 +58,11 @@ export async function fetchPNodes(): Promise<{ nodes: PNode[]; raw: unknown; sou
     // If the bundle was built without the env var, force a runtime fallback to the Render proxy so the
     // deployed frontend can reach a working backend immediately.
     const RENDER_PROXY = 'https://prpc-proxy.onrender.com/api/prpc-proxy';
-    const API_URL = (import.meta as any).env?.VITE_PRPC_PROXY_URL ?? (typeof window !== 'undefined' ? (window as any).__PRPC_PROXY_URL : undefined) ?? '/api/prpc-proxy';
+    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    const API_URL = env?.VITE_PRPC_PROXY_URL ?? (typeof window !== 'undefined' ? window.__PRPC_PROXY_URL : undefined) ?? '/api/prpc-proxy';
     const RUNTIME_API_URL: string = (typeof window !== 'undefined' && API_URL === '/api/prpc-proxy') ? RENDER_PROXY : API_URL;
     if (typeof window !== 'undefined') {
-      (window as any).__PRPC_PROXY_USED = RUNTIME_API_URL;
+      window.__PRPC_PROXY_USED = RUNTIME_API_URL;
       // Helpful runtime log to verify which proxy the built app is using in the browser console
       // (remove this after verification).
       // eslint-disable-next-line no-console
