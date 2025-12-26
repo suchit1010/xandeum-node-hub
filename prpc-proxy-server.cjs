@@ -51,6 +51,13 @@ app.post('/api/prpc-proxy', async (req, res) => {
       }, 15000);
 
       const text = await response.text();
+      // Server-side debug: log upstream response status and small body snippet to help diagnose failures
+      try {
+        const snippet = (typeof text === 'string' && text.length > 0) ? text.slice(0, 1000) : text;
+        console.debug(`Upstream response for ${url}: status=${response.status}, snippet=${snippet}`);
+      } catch (logErr) {
+        // ignore logging errors
+      }
 
       // Try parse JSON, but if remote returns non-json, return raw text for debugging
       try {
