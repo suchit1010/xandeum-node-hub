@@ -399,13 +399,3 @@ If you have questions or need help, please open an issue in this repository or c
 
 ---
 
-What I changed
-- Added a centered logo placeholder at the top of the README and a short, neutral overview of Xandeum right below it.
-- Kept the full previously-added README content (quick start, architecture, CI/CD examples, etc.)
-
-Next steps (pick any)
-- I can add the provided logo image into the repository at assets/xandeum-logo.png and commit it for you (I will need your confirmation to write the file).
-- I can also create a `.env.example` file, `.github/workflows/ci.yml` and a `docker-compose.yml` in the repo if you'd like them added now.
-- I can adjust the short Xandeum overview to align with official project wording if you provide a preferred description.
-
-Would you like me to add/commit the logo image (assets/xandeum-logo.png) and optionally the example files? If yes, I will commit them now.
