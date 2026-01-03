@@ -58,3 +58,95 @@ export const countryCentroids: Record<string, { lat: number; lon: number }> = {
 };
 
 export const allCountryKeys = Object.keys(countryCentroids);
+
+// Country to ISO code mapping
+const countryToISO: Record<string, string> = {
+  "France": "FR",
+  "Grand Est, France": "FR",
+  "United States": "US",
+  "Washington, United States": "US",
+  "Virginia, United States": "US",
+  "Missouri, United States": "US",
+  "Canada": "CA",
+  "United Kingdom": "GB",
+  "England, United Kingdom": "GB",
+  "Germany": "DE",
+  "Bavaria, Germany": "DE",
+  "Hesse, Germany": "DE",
+  "Spain": "ES",
+  "Italy": "IT",
+  "Netherlands": "NL",
+  "Sweden": "SE",
+  "Norway": "NO",
+  "Denmark": "DK",
+  "Poland": "PL",
+  "Belgium": "BE",
+  "Switzerland": "CH",
+  "Ireland": "IE",
+  "Portugal": "PT",
+  "Austria": "AT",
+  "Czechia": "CZ",
+  "Hungary": "HU",
+  "Romania": "RO",
+  "Bulgaria": "BG",
+  "Greece": "GR",
+  "Turkey": "TR",
+  "Russia": "RU",
+  "India": "IN",
+  "China": "CN",
+  "Japan": "JP",
+  "South Korea": "KR",
+  "Indonesia": "ID",
+  "Philippines": "PH",
+  "Malaysia": "MY",
+  "Singapore": "SG",
+  "Vietnam": "VN",
+  "Thailand": "TH",
+  "Australia": "AU",
+  "New Zealand": "NZ",
+  "Waikato Region, New Zealand": "NZ",
+  "Brazil": "BR",
+  "Argentina": "AR",
+  "Chile": "CL",
+  "Mexico": "MX",
+  "Colombia": "CO",
+  "Peru": "PE",
+  "Nigeria": "NG",
+  "Rivers State, Nigeria": "NG",
+  "South Africa": "ZA",
+  "Kenya": "KE",
+  "Egypt": "EG",
+  "UAE": "AE",
+  "Saudi Arabia": "SA",
+};
+
+// Function to get flag emoji from country code or region
+export function getCountryFlag(region?: string): string {
+  if (!region) return "🌍";
+  
+  // First try exact match
+  let isoCode = countryToISO[region];
+  
+  // If no exact match, try to extract country from region (last part after comma)
+  if (!isoCode) {
+    const parts = region.split(',').map(p => p.trim());
+    const country = parts[parts.length - 1]; // Last part is usually the country
+    isoCode = countryToISO[country];
+    
+    // Debug: log if we're getting a fallback
+    if (!isoCode && region !== "Unknown") {
+      console.warn(`[geo.ts] Could not find ISO code for region: "${region}", tried country: "${country}"`);
+    }
+  }
+  
+  // Fallback to globe emoji if not found
+  if (!isoCode) return "🌍";
+  
+  // Convert ISO code to flag emoji using regional indicator symbols
+  const codePoints = isoCode
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt(0));
+  
+  return String.fromCodePoint(...codePoints);
+}

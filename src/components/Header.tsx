@@ -30,29 +30,29 @@ export function Header({ onRefresh, isLoading, refreshInterval, setRefreshInterv
 
   return (
     <header className="sticky top-0 z-50 glass-card border-b border-border/50">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
+      <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3">
+        <div className="flex items-center justify-between gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
           {/* Logo */}
-          <div className="flex items-center">
-            <img src={xandeumLogo} alt="Xandeum" className="h-10 w-auto" />
+          <div className="flex items-center flex-shrink-0">
+            <img src={xandeumLogo} alt="Xandeum" className="h-8 sm:h-10 w-auto" />
           </div>
 
           {/* Search */}
-          <div className="flex-1 max-w-md hidden md:block">
+          <div className="flex-1 min-w-0 hidden md:block md:max-w-sm">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground flex-shrink-0" />
               <Input
-                placeholder="Search pNodes by ID or address..."
+                placeholder="Search pNodes..."
                 value={searchQuery ?? ''}
                 onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-                className="pl-10 bg-secondary/50 border-border/50 focus:border-primary/50"
+                className="pl-10 h-9 text-sm bg-secondary/50 border-border/50 focus:border-primary/50"
               />
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
-            <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground mr-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <div className="hidden xl:flex items-center gap-2 text-xs text-muted-foreground mr-2">
               <span className="h-2 w-2 rounded-full bg-emerald-500 pulse-dot" />
               <span>Live</span>
               <span className="text-border">•</span>
@@ -69,10 +69,10 @@ export function Header({ onRefresh, isLoading, refreshInterval, setRefreshInterv
               <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             </Button>
             
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Auto-refresh:</span>
+            <div className="hidden lg:flex items-center gap-2">
+              <span className="text-xs lg:text-sm text-muted-foreground">Auto:</span>
               <Select value={String(refreshInterval)} onValueChange={(v) => setRefreshInterval(Number(v))}>
-                <SelectTrigger className="w-[110px] h-8 bg-secondary/50 border-border/50">
+                <SelectTrigger className="w-[100px] h-8 text-sm bg-secondary/50 border-border/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
