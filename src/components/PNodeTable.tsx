@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { formatPercent, formatStake } from "@/lib/format";
+import { getCountryFlag } from "@/lib/geo";
 import { 
   ArrowUpDown, 
   ArrowUp, 
@@ -45,6 +46,52 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+
+// Country flag mapping
+const countryFlagMap: Record<string, string> = {
+  'France': '🇫🇷',
+  'United States': '🇺🇸',
+  'Germany': '🇩🇪',
+  'United Kingdom': '🇬🇧',
+  'Canada': '🇨🇦',
+  'Australia': '🇦🇺',
+  'Japan': '🇯🇵',
+  'India': '🇮🇳',
+  'Brazil': '🇧🇷',
+  'Mexico': '🇲🇽',
+  'Netherlands': '🇳🇱',
+  'Spain': '🇪🇸',
+  'Italy': '🇮🇹',
+  'South Korea': '🇰🇷',
+  'Singapore': '🇸🇬',
+  'Hong Kong': '🇭🇰',
+  'China': '🇨🇳',
+  'Russia': '🇷🇺',
+  'Sweden': '🇸🇪',
+  'Switzerland': '🇨🇭',
+  'Belgium': '🇧🇪',
+  'Austria': '🇦🇹',
+  'Norway': '🇳🇴',
+  'Poland': '🇵🇱',
+  'Czech Republic': '🇨🇿',
+  'Portugal': '🇵🇹',
+  'Greece': '🇬🇷',
+  'Turkey': '🇹🇷',
+  'South Africa': '🇿🇦',
+  'Israel': '🇮🇱',
+  'UAE': '🇦🇪',
+  'Thailand': '🇹🇭',
+  'Vietnam': '🇻🇳',
+  'Philippines': '🇵🇭',
+  'Indonesia': '🇮🇩',
+  'Malaysia': '🇲🇾',
+  'New Zealand': '🇳🇿',
+  'Ireland': '🇮🇪',
+  'Denmark': '🇩🇰',
+  'Finland': '🇫🇮',
+};
+
+// Local getCountryFlag function removed - importing from geo.ts instead
 
 // Simple inline sparkline component (SVG)
 function Sparkline({ values, color = '#2dd4bf', width = 80, height = 24 }: { values: number[]; color?: string; width?: number; height?: number }) {
@@ -298,29 +345,29 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
   };
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
+    <div className="glass-card rounded-lg sm:rounded-xl overflow-hidden">
       {/* Table Header Info */}
-      <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between bg-secondary/20">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-secondary/20">
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
           <span>Showing</span>
           <span className="font-semibold text-foreground">{startIndex + 1}-{Math.min(startIndex + rowsPerPage, sortedNodes.length)}</span>
           <span>of</span>
           <span className="font-semibold text-foreground">{sortedNodes.length}</span>
           <span>pNodes</span>
           {globeFilter && (
-            <div className="ml-3 inline-flex items-center gap-2 bg-secondary/40 border border-border rounded-full px-3 py-1 text-xs text-foreground">
+            <div className="ml-2 inline-flex items-center gap-1 sm:gap-2 bg-secondary/40 border border-border rounded-full px-2 sm:px-3 py-0.5 sm:py-1 text-xs text-foreground">
               <span className="font-medium">Filter:</span>
-              <span className="font-mono">{globeFilter}</span>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setGlobeFilter(null); setCurrentPage(1); }}>
+              <span className="font-mono text-xs">{globeFilter}</span>
+              <Button variant="ghost" size="icon" className="h-4 w-4 sm:h-6 sm:w-6" onClick={() => { setGlobeFilter(null); setCurrentPage(1); }}>
                 ✕
               </Button>
             </div>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Rows:</span>
+          <span className="text-xs sm:text-sm text-muted-foreground">Rows:</span>
           <Select value={String(rowsPerPage)} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
-            <SelectTrigger className="w-[70px] h-8 bg-secondary/50 border-border/50">
+            <SelectTrigger className="w-[65px] h-8 text-sm bg-secondary/50 border-border/50">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
@@ -337,8 +384,8 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="border-border/50 hover:bg-transparent">
-              <TableHead className="w-12">#</TableHead>
-              <TableHead>
+              <TableHead className="w-8 sm:w-12 text-xs sm:text-sm">#</TableHead>
+              <TableHead className="text-xs sm:text-sm">
                 <div className="flex items-center gap-1">
                   Node
                   <TooltipProvider>
@@ -353,35 +400,39 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                   </TooltipProvider>
                 </div>
               </TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>
+              <TableHead className="text-xs sm:text-sm">Status</TableHead>
+              <TableHead className="text-xs sm:text-sm">
                 <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("uptime")}>
-                  Uptime <SortIcon field="uptime" />
+                  <span className="hidden sm:inline">Uptime</span>
+                  <span className="sm:hidden">Up</span>
+                  <SortIcon field="uptime" />
                 </Button>
               </TableHead>
-              <TableHead className="hidden lg:table-cell">
+              <TableHead className="hidden lg:table-cell text-xs sm:text-sm">
                 <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("capacity")}>
                   Capacity <SortIcon field="capacity" />
                 </Button>
               </TableHead>
-              <TableHead className="hidden md:table-cell">
+              <TableHead className="hidden md:table-cell text-xs sm:text-sm">
                 <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("region")}>
                   Region <SortIcon field="region" />
                 </Button>
               </TableHead>
-              <TableHead className="hidden md:table-cell">Credits</TableHead>
-              <TableHead>
+              <TableHead className="hidden md:table-cell text-xs sm:text-sm">Credits</TableHead>
+              <TableHead className="text-xs sm:text-sm">
                 <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("stake")}>
-                  Stake <SortIcon field="stake" />
+                  <span className="hidden sm:inline">Stake</span>
+                  <span className="sm:hidden">Stake</span>
+                  <SortIcon field="stake" />
                 </Button>
               </TableHead>
-              <TableHead className="hidden xl:table-cell">Version</TableHead>
-              <TableHead className="hidden sm:table-cell">
+              <TableHead className="hidden xl:table-cell text-xs sm:text-sm">Version</TableHead>
+              <TableHead className="hidden sm:table-cell text-xs sm:text-sm">
                 <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2" onClick={() => handleSort("lastSeen")}>
                   Last Seen <SortIcon field="lastSeen" />
                 </Button>
               </TableHead>
-              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-8 sm:w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -390,33 +441,33 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                 key={node.id}
                 className={`data-table-row border-border/30 ${globeFilter && String(node.region ?? '').toLowerCase().includes(String(globeFilter ?? '').toLowerCase()) ? 'bg-secondary/10 ring-1 ring-xandeum-orange/10' : ''}`}
               >
-                <TableCell className="font-mono text-muted-foreground">
+                <TableCell className="font-mono text-xs sm:text-sm text-muted-foreground">
                   {node.isTop && <Star className="h-3 w-3 text-xandeum-orange inline mr-1" />}
                   {startIndex + index + 1}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-xs sm:text-sm">
                   <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium">{node.id}</span>
-                      <button onClick={() => copyPubkey(node.id)} className="ml-2 text-xs text-muted-foreground hover:text-foreground">Copy pubkey</button>
-                      {node.isTop && <Shield className="h-3 w-3 text-primary" />}
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="font-mono font-medium text-xs sm:text-sm truncate">{node.id}</span>
+                      <button onClick={() => copyPubkey(node.id)} className="ml-1 text-xs text-muted-foreground hover:text-foreground flex-shrink-0">Copy</button>
+                      {node.isTop && <Shield className="h-3 w-3 text-primary flex-shrink-0" />}
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                      <span className="truncate max-w-[120px]">{node.address}</span>
-                      <button onClick={() => copyAddress(node.address)} className="hover:text-foreground">
+                      <span className="truncate max-w-[100px] sm:max-w-[150px]">{node.address}</span>
+                      <button onClick={() => copyAddress(node.address)} className="hover:text-foreground flex-shrink-0">
                         <Copy className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{getStatusBadge(node.status)}</TableCell>
-                <TableCell>
+                <TableCell className="text-xs sm:text-sm">{getStatusBadge(node.status)}</TableCell>
+                <TableCell className="text-xs sm:text-sm">
                   <div className="space-y-1">
-                    <span className={`font-medium ${node.uptime >= 99 ? "text-emerald-400" : node.uptime >= 95 ? "text-primary" : "text-xandeum-orange"}`}>
+                    <span className={`text-xs sm:text-sm font-medium ${node.uptime >= 99 ? "text-emerald-400" : node.uptime >= 95 ? "text-primary" : "text-xandeum-orange"}`}>
                       {formatPercent(Number(node.uptime ?? 0), 1)}
                     </span>
                     <div className="flex items-center gap-2">
-                      <div className="progress-bar w-16 sm:w-20">
+                      <div className="progress-bar w-12 sm:w-16 md:w-20">
                         <div className="progress-bar-fill" style={{ width: `${node.uptime}%` }} />
                       </div>
                       <div className="hidden sm:block">
@@ -426,10 +477,10 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="hidden lg:table-cell">
+                <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
                   <div className="space-y-1">
-                    <span className="font-medium">{formatPercent(Number(node.capacity ?? 0), 1)}</span>
-                    <div className="progress-bar w-20">
+                    <span className="text-xs sm:text-sm font-medium">{formatPercent(Number(node.capacity ?? 0), 1)}</span>
+                    <div className="progress-bar w-16 sm:w-20">
                       <div 
                         className="progress-bar-fill" 
                         style={{ 
@@ -440,36 +491,36 @@ export function PNodeTable({ nodes, onViewDetails }: PNodeTableProps) {
                   </div>
                 </TableCell>
                 {/* Region cell */}
-                <TableCell className="hidden md:table-cell">
+                <TableCell className="hidden md:table-cell text-xs sm:text-sm">
                   {(() => {
                     const regionName = node.region?.trim() || 'Unknown';
                     const count = nodesPerRegion.get(regionName) ?? 0;
                     const title = `${count} node${count === 1 ? '' : 's'} in this region`;
                     const showUnknown = regionName === 'Unknown';
-                    const emoji = '🌐';
+                    const flag = getCountryFlag(regionName);
                     return (
-                      <div title={title} className={`flex items-center gap-2 ${showUnknown ? 'text-muted-foreground' : ''}`}>
-                        <span className="text-sm">{emoji}</span>
-                        <span className={`text-sm ${showUnknown ? 'text-muted-foreground' : ''}`}>{regionName}</span>
+                      <div title={title} className={`flex items-center gap-1.5 sm:gap-2 ${showUnknown ? 'text-muted-foreground' : ''}`}>
+                        <span className="text-sm sm:text-base">{flag}</span>
+                        <span className={`text-xs sm:text-sm ${showUnknown ? 'text-muted-foreground' : ''}`}>{regionName}</span>
                       </div>
                     );
                   })()}
                 </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  <span className="font-mono">{formatStake(node.stake ?? 0)}</span>
+                <TableCell className="hidden md:table-cell text-xs sm:text-sm">
+                  <span className="font-mono text-xs sm:text-sm">{formatStake(node.stake ?? 0)}</span>
                 </TableCell>
-                <TableCell>
-                  <span className="font-mono text-primary font-medium">
+                <TableCell className="text-xs sm:text-sm">
+                  <span className="font-mono text-primary font-medium text-xs sm:text-sm">
                     {formatStake(node.stake ?? 0)}
                   </span>
                 </TableCell>
-                <TableCell className="hidden xl:table-cell">
+                <TableCell className="hidden xl:table-cell text-xs sm:text-sm">
                   <Badge variant="secondary" className="font-mono text-xs">
                     {formatVersion(node.version)}
                   </Badge>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <span className="text-muted-foreground text-sm">
+                <TableCell className="hidden sm:table-cell text-xs sm:text-sm">
+                  <span className="text-muted-foreground text-xs sm:text-sm">
                     {formatTimeSince(node.lastSeen)}
                   </span>
                 </TableCell>

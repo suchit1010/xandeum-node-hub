@@ -296,9 +296,9 @@ const Index = () => {
         setSearchQuery={setSearchQuery}
       />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="w-full px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 max-w-7xl mx-auto">
         {error && (
-          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+          <div className="mb-3 sm:mb-4 p-2 sm:p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs sm:text-sm">
             {error}
           </div>
         )}
@@ -314,23 +314,24 @@ const Index = () => {
         <NetworkCharts statusData={statusData} trendData={trendData} />
 
         {/* Tabs Section */}
-        <Tabs defaultValue="all-nodes" className="space-y-6">
-          <TabsList className="glass-card p-1 bg-secondary/50">
-            <TabsTrigger value="all-nodes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Activity className="h-4 w-4 mr-2" />
+        <Tabs defaultValue="all-nodes" className="space-y-3 sm:space-y-4 md:space-y-6">
+          <TabsList className="glass-card p-1 bg-secondary/50 w-full flex justify-start sm:justify-start">
+            <TabsTrigger value="all-nodes" className="text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Activity className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               All pNodes
             </TabsTrigger>
-            <TabsTrigger value="leaderboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Trophy className="h-4 w-4 mr-2" />
-              Leaderboard
+            <TabsTrigger value="leaderboard" className="text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Trophy className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Leaderboard</span>
+              <span className="sm:hidden">Leader</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <BarChart3 className="h-4 w-4 mr-2" />
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Analytics
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="all-nodes" className="space-y-4">
+          <TabsContent value="all-nodes" className="space-y-3 sm:space-y-4">
             <FilterBar
               statusFilter={statusFilter}
               setStatusFilter={setStatusFilter}
@@ -360,24 +361,24 @@ const Index = () => {
             {viewMode === "table" ? (
               <PNodeTable nodes={filteredNodes} onViewDetails={(n) => setSelectedNode(n)} />
             ) : (
-              <VirtualizedGrid nodes={filteredNodes} />
+              <VirtualizedGrid nodes={filteredNodes} onViewDetails={(n) => setSelectedNode(n)} />
             )}
             <NodeDetailsModal open={!!selectedNode} onOpenChange={(o) => { if (!o) setSelectedNode(null); }} node={selectedNode} />
           </TabsContent>
 
           <TabsContent value="leaderboard">
-            <div className="glass-card rounded-xl p-6">
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-xandeum-orange" />
+            <div className="glass-card rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6">
+              <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 flex items-center gap-2">
+                <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-xandeum-orange" />
                 Top 10 pNodes by Stake
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {topNodes.map((node, index) => (
                   <div 
                     key={node.id}
-                    className="flex items-center gap-4 p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
                   >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 text-xs sm:text-sm ${
                       index === 0 ? "bg-xandeum-orange/20 text-xandeum-orange" :
                       index === 1 ? "bg-gray-300/20 text-gray-300" :
                       index === 2 ? "bg-amber-700/20 text-amber-600" :
@@ -385,19 +386,21 @@ const Index = () => {
                     }`}>
                       {index + 1}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-mono font-semibold">{node.id}</p>
-                      <p className="text-sm text-muted-foreground">{node.region}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono font-semibold text-xs sm:text-sm truncate">{node.id}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{node.region}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono font-bold text-primary">
-                        {(node.stake / 1000).toFixed(1)}K
-                      </p>
-                      <p className="text-sm text-muted-foreground">staked</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-emerald-400">{node.uptime}%</p>
-                      <p className="text-sm text-muted-foreground">uptime</p>
+                    <div className="flex gap-3 sm:gap-4 w-full sm:w-auto text-right">
+                      <div className="flex-1 sm:flex-none">
+                        <p className="font-mono font-bold text-primary text-xs sm:text-sm">
+                          {(node.stake / 1000).toFixed(1)}K
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">staked</p>
+                      </div>
+                      <div className="flex-1 sm:flex-none">
+                        <p className="font-semibold text-emerald-400 text-xs sm:text-sm">{node.uptime}%</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">uptime</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -415,7 +418,7 @@ const Index = () => {
         </Tabs>
 
         {/* Footer */}
-        <footer className="mt-16 py-8 border-t border-border/50 text-center text-muted-foreground text-sm">
+        <footer className="mt-8 sm:mt-12 md:mt-16 py-4 sm:py-6 md:py-8 border-t border-border/50 text-center text-muted-foreground text-xs sm:text-sm">
           <p>© 2024 Xandeum Network. Built for the pNode Analytics Bounty.</p>
           <p className="mt-1">Real-time validator metrics powered by pRPC from Xandeum gossip network</p>
         </footer>

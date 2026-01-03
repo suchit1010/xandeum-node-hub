@@ -292,23 +292,23 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
         <div>
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
+          <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+            <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             Advanced Network Analytics
           </h3>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Deep dive into pNode performance metrics and network trends
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
           <Button 
             variant="outline" 
             size="sm" 
-            className={`border-border/50 ${selectedTimeRange === "24h" ? "bg-primary/20" : ""}`}
+            className={`h-8 text-xs sm:text-sm border-border/50 ${selectedTimeRange === "24h" ? "bg-primary/20" : ""}`}
             onClick={() => setSelectedTimeRange("24h")}
           >
             24h
@@ -316,7 +316,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
           <Button 
             variant="outline" 
             size="sm" 
-            className={`border-border/50 ${selectedTimeRange === "7d" ? "bg-primary/20" : ""}`}
+            className={`h-8 text-xs sm:text-sm border-border/50 ${selectedTimeRange === "7d" ? "bg-primary/20" : ""}`}
             onClick={() => setSelectedTimeRange("7d")}
           >
             7 Days
@@ -354,9 +354,9 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
       {centralization.topRegion && (
         <CentralizationAlert topRegion={centralization.topRegion} stakePct={centralization.stakePct} capacityPct={centralization.capacityPct} threshold={30} />
       )}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
         <MetricCard
-          icon={<TrendingUp className="h-5 w-5" />}
+          icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
           label="Avg Uptime"
           value={`${metrics.avgUptime}%`}
           trend={+2.3}
@@ -364,7 +364,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
           tooltip="Average percentage of time all pNodes have been active"
         />
         <MetricCard
-          icon={<Database className="h-5 w-5" />}
+          icon={<Database className="h-4 w-4 sm:h-5 sm:w-5" />}
           label="Avg Capacity"
           value={`${metrics.avgCapacity}%`}
           trend={-1.2}
@@ -372,7 +372,7 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
           tooltip="Average storage utilization across all pNodes"
         />
         <MetricCard
-          icon={<Users className="h-5 w-5" />}
+          icon={<Users className="h-4 w-4 sm:h-5 sm:w-5" />}
           label="Total Peers"
           value={metrics.totalPeers.toLocaleString()}
           trend={+5.7}
@@ -390,41 +390,41 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
       </div>
 
       {/* Status Overview Row */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
-          <div className="p-3 rounded-full bg-emerald-500/20">
-            <CheckCircle className="h-6 w-6 text-emerald-400" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+        <div className="glass-card rounded-lg sm:rounded-xl p-2 sm:p-4 flex items-center gap-2 sm:gap-4">
+          <div className="p-2 sm:p-3 rounded-full bg-emerald-500/20 flex-shrink-0">
+            <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-emerald-400">{statusBreakdown.online}</p>
-            <p className="text-sm text-muted-foreground">Online Nodes</p>
-          </div>
-        </div>
-        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
-          <div className="p-3 rounded-full bg-amber-500/20">
-            <Activity className="h-6 w-6 text-amber-400" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-amber-400">{statusBreakdown.syncing}</p>
-            <p className="text-sm text-muted-foreground">Syncing</p>
+          <div className="min-w-0">
+            <p className="text-lg sm:text-2xl font-bold text-emerald-400">{statusBreakdown.online}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Online Nodes</p>
           </div>
         </div>
-        <div className="glass-card rounded-xl p-4 flex items-center gap-4">
-          <div className="p-3 rounded-full bg-red-500/20">
-            <AlertCircle className="h-6 w-6 text-red-400" />
+        <div className="glass-card rounded-lg sm:rounded-xl p-2 sm:p-4 flex items-center gap-2 sm:gap-4">
+          <div className="p-2 sm:p-3 rounded-full bg-amber-500/20 flex-shrink-0">
+            <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-red-400">{statusBreakdown.offline}</p>
-            <p className="text-sm text-muted-foreground">Offline</p>
+          <div className="min-w-0">
+            <p className="text-lg sm:text-2xl font-bold text-amber-400">{statusBreakdown.syncing}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Syncing</p>
+          </div>
+        </div>
+        <div className="glass-card rounded-lg sm:rounded-xl p-2 sm:p-4 flex items-center gap-2 sm:gap-4">
+          <div className="p-2 sm:p-3 rounded-full bg-red-500/20 flex-shrink-0">
+            <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-lg sm:text-2xl font-bold text-red-400">{statusBreakdown.offline}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Offline</p>
           </div>
         </div>
       </div>
 
       {/* Network Health Score + Regional Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
         {/* Health Score */}
-        <div className="glass-card rounded-xl p-6">
-          <h4 className="font-semibold mb-4 flex items-center gap-2">
+        <div className="glass-card rounded-lg sm:rounded-xl p-3 sm:p-6">
+          <h4 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 flex items-center gap-2">
             <Activity className="h-4 w-4 text-primary" />
             Network Health Score
             <TooltipProvider>
@@ -432,19 +432,19 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
                 <TooltipTrigger asChild>
                   <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
-                <TooltipContent className="max-w-[260px] bg-popover border-border">
+                <TooltipContent className="max-w-[260px] bg-popover border-border text-xs sm:text-sm">
                   <p>Network Health is a composite score computed as:</p>
-                  <ul className="list-inside list-disc text-sm">
+                  <ul className="list-inside list-disc text-xs sm:text-sm">
                     <li><strong>50%</strong> Availability (online / total)</li>
                     <li><strong>30%</strong> Avg uptime (normalized)</li>
                     <li><strong>20%</strong> Version freshness (percent on latest)</li>
                   </ul>
-                  <p className="text-xs text-muted-foreground mt-2">Shows sample size and trust: health may be untrusted if probe coverage is low.</p>
+                  <p className="text-xs text-muted-foreground mt-1 sm:mt-2">Shows sample size and trust: health may be untrusted if probe coverage is low.</p>
                 </TooltipContent>
               </TooltipUI>
             </TooltipProvider>
           </h4>
-          <div className="h-[200px] relative">
+          <div className="h-[160px] sm:h-[200px] relative">
               <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart
                   cx="50%"
@@ -671,10 +671,10 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
       </div>
 
       {/* Capacity + Traffic Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
         {/* Capacity Utilization */}
-        <div className="glass-card rounded-xl p-6">
-          <h4 className="font-semibold mb-4 flex items-center gap-2">
+        <div className="glass-card rounded-lg sm:rounded-xl p-3 sm:p-6">
+          <h4 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 flex items-center gap-2">
             <Cpu className="h-4 w-4 text-primary" />
             Capacity Utilization
             <TooltipProvider>
@@ -682,18 +682,18 @@ export function AnalyticsTab({ nodes, coverageAttempted = 0, coverageResponded =
                 <TooltipTrigger asChild>
                   <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
-                <TooltipContent className="max-w-[200px] bg-popover border-border">
+                <TooltipContent className="max-w-[200px] bg-popover border-border text-xs sm:text-sm">
                   <p>Distribution of storage usage across pNodes</p>
                 </TooltipContent>
               </TooltipUI>
             </TooltipProvider>
           </h4>
-          <div className="h-[200px]">
+          <div className="h-[160px] sm:h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={capacityData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 20% 18%)" horizontal={false} />
-                <XAxis type="number" stroke="hsl(215 15% 55%)" fontSize={12} />
-                <YAxis dataKey="name" type="category" stroke="hsl(215 15% 55%)" fontSize={12} width={60} />
+                <XAxis type="number" stroke="hsl(215 15% 55%)" fontSize={10} />
+                <YAxis dataKey="name" type="category" stroke="hsl(215 15% 55%)" fontSize={10} width={50} />
                 <Tooltip contentStyle={tooltipStyle} />
                   <Bar dataKey="count" radius={[0, 8, 8, 0]}>
                     {capacityData.map((entry, index) => (

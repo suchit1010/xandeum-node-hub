@@ -102,8 +102,8 @@ function StatCard({
         </div>
       ) : (
         <div className="space-y-1">
-          <p className="text-2xl lg:text-3xl font-bold tracking-tight">{value}</p>
-          <p className="text-sm text-muted-foreground">{title}</p>
+          <p className="text-lg sm:text-2xl lg:text-3xl font-bold tracking-tight">{value}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">{title}</p>
         </div>
       )}
     </div>
@@ -131,21 +131,21 @@ interface NetworkStatsProps {
 export function NetworkStats({ stats, lastUpdated }: NetworkStatsProps) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   return (
-    <section className="mb-8">
-      <div className="flex items-center justify-between mb-6">
+    <section className="mb-6 sm:mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div>
-          <h2 className="text-2xl font-bold">Network Overview</h2>
-          <p className="text-muted-foreground">Real-time pNode network statistics from pRPC gossip</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Network Overview</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Real-time pNode network statistics</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {lastUpdated && (
-            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground bg-secondary/30 px-3 py-1.5 rounded-full mr-2">
+            <div className="hidden xs:flex items-center gap-2 text-xs text-muted-foreground bg-secondary/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Last sync: {lastUpdated.toLocaleTimeString()}</span>
+              <span className="hidden sm:inline">Last sync: {lastUpdated.toLocaleTimeString()}</span>
             </div>
           )}
           <button
-            className="text-sm text-muted-foreground bg-secondary/30 px-3 py-1 rounded-full flex items-center gap-2"
+            className="text-xs sm:text-sm text-muted-foreground bg-secondary/30 px-2 sm:px-3 py-1 sm:py-1 rounded-full flex items-center gap-2"
             onClick={() => setShowBreakdown(!showBreakdown)}
             aria-expanded={showBreakdown}
             aria-controls="network-health-breakdown"
@@ -156,7 +156,7 @@ export function NetworkStats({ stats, lastUpdated }: NetworkStatsProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <StatCard
           title="Total pNodes"
           value={stats.totalNodes.toLocaleString()}
@@ -215,30 +215,30 @@ export function NetworkStats({ stats, lastUpdated }: NetworkStatsProps) {
       </div>
 
       {showBreakdown && (
-        <div id="network-health-breakdown" className="mt-4 glass-card p-4 rounded-xl">
-          <h3 className="font-semibold mb-2">Health Score Breakdown</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-3 rounded-lg bg-secondary/20">
+        <div id="network-health-breakdown" className="mt-3 sm:mt-4 glass-card p-3 sm:p-4 rounded-lg sm:rounded-xl">
+          <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">Health Score Breakdown</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+            <div className="p-2 sm:p-3 rounded-lg bg-secondary/20">
               <div className="text-xs text-muted-foreground">Availability</div>
-              <div className="text-lg font-bold">{stats.availabilityScore ?? 'n/a'}%</div>
+              <div className="text-base sm:text-lg font-bold">{stats.availabilityScore ?? 'n/a'}%</div>
             </div>
-            <div className="p-3 rounded-lg bg-secondary/20">
+            <div className="p-2 sm:p-3 rounded-lg bg-secondary/20">
               <div className="text-xs text-muted-foreground">Uptime</div>
-              <div className="text-lg font-bold">{stats.uptimeScore ?? 'n/a'}%</div>
+              <div className="text-base sm:text-lg font-bold">{stats.uptimeScore ?? 'n/a'}%</div>
             </div>
-            <div className="p-3 rounded-lg bg-secondary/20">
+            <div className="p-2 sm:p-3 rounded-lg bg-secondary/20">
               <div className="text-xs text-muted-foreground">Version Freshness</div>
-              <div className="text-lg font-bold">{stats.versionScore ?? 'n/a'}%</div>
+              <div className="text-base sm:text-lg font-bold">{stats.versionScore ?? 'n/a'}%</div>
             </div>
-            <div className="p-3 rounded-lg bg-secondary/20">
+            <div className="p-2 sm:p-3 rounded-lg bg-secondary/20">
               <div className="text-xs text-muted-foreground">Coverage</div>
-              <div className="text-lg font-bold">{stats.coverageResponded ?? 'n/a'}/{stats.coverageAttempted ?? 'n/a'}</div>
+              <div className="text-base sm:text-lg font-bold">{stats.coverageResponded ?? 'n/a'}/{stats.coverageAttempted ?? 'n/a'}</div>
               {typeof stats.lastFetchDurationMs === 'number' && (
                 <div className="text-xs text-muted-foreground">probe: {stats.lastFetchDurationMs}ms</div>
               )}
             </div>
           </div>
-          <div className="mt-3 text-sm text-muted-foreground">
+          <div className="mt-2 sm:mt-3 text-xs sm:text-sm text-muted-foreground">
             <strong>Formula:</strong> networkHealth = 0.5 * availability + 0.3 * uptime + 0.2 * version (each clamped 0–100).
           </div>
         </div>

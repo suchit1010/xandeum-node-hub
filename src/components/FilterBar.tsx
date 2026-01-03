@@ -42,20 +42,20 @@ export function FilterBar({
   onExport,
 }: FilterBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-4 mb-6">
+    <div className="flex flex-col gap-3 mb-4 sm:mb-6">
       <div className="flex-1 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground flex-shrink-0" />
         <Input
-          placeholder="Search by Node ID or address..."
+          placeholder="Search by Node ID..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-secondary/50 border-border/50"
+          className="pl-10 h-9 text-sm bg-secondary/50 border-border/50"
         />
       </div>
       
       <div className="flex gap-2 flex-wrap">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px] bg-secondary/50 border-border/50">
+          <SelectTrigger className="h-9 text-sm flex-1 sm:flex-none sm:w-[130px] bg-secondary/50 border-border/50">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -68,7 +68,7 @@ export function FilterBar({
         </Select>
 
         <Select value={regionFilter} onValueChange={setRegionFilter}>
-          <SelectTrigger className="w-[200px] bg-secondary/50 border-border/50">
+          <SelectTrigger className="h-9 text-sm flex-1 sm:flex-none sm:w-[160px] bg-secondary/50 border-border/50">
             <SelectValue placeholder="Region" />
           </SelectTrigger>
           <SelectContent className="bg-popover border-border max-h-60 overflow-auto">
@@ -77,7 +77,7 @@ export function FilterBar({
             <SelectItem value="eu">Europe</SelectItem>
             <SelectItem value="asia">Asia Pacific</SelectItem>
             {regions.length > 0 && (
-              <div className="px-2 pt-2 text-xs text-muted-foreground">Specific Regions</div>
+              <div className="px-2 pt-1 text-xs text-muted-foreground">Specific Regions</div>
             )}
             {regions.map(r => (
               <SelectItem key={r} value={r}>{r}</SelectItem>
@@ -88,7 +88,7 @@ export function FilterBar({
         {/* Version filter (optional) */}
         {versions && setVersionFilter && (
           <Select value={versionFilter} onValueChange={setVersionFilter}>
-            <SelectTrigger className="w-[160px] bg-secondary/50 border-border/50">
+            <SelectTrigger className="h-9 text-sm flex-1 sm:flex-none sm:w-[140px] bg-secondary/50 border-border/50">
               <SelectValue placeholder="Version" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
@@ -103,23 +103,23 @@ export function FilterBar({
         <div className="flex border border-border/50 rounded-lg overflow-hidden">
           <Button
             variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="icon"
-            className="rounded-none"
+            size="sm"
+            className="rounded-none h-9"
             onClick={() => setViewMode("table")}
           >
             <List className="h-4 w-4" />
           </Button>
           <Button
             variant={viewMode === "grid" ? "secondary" : "ghost"}
-            size="icon"
-            className="rounded-none"
+            size="sm"
+            className="rounded-none h-9"
             onClick={() => setViewMode("grid")}
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>
         </div>
 
-        <Button variant="outline" className="border-border/50" onClick={() => onExport && onExport()}>
+        <Button variant="outline" size="sm" className="border-border/50 h-9 text-sm" onClick={() => onExport && onExport()}>
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>
